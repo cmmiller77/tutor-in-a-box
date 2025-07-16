@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { BookOpen, Brain } from "lucide-react"
+import { Link } from "react-router-dom"
 
 const Header = () => {
   return (
@@ -13,15 +14,12 @@ const Header = () => {
         </div>
         
         <nav className="hidden md:flex items-center gap-8">
-          <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-            Features
-          </a>
-          <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
             How it Works
-          </a>
-          <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+          </Link>
+          <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
             Pricing
-          </a>
+          </Link>
         </nav>
 
         <div className="flex items-center gap-4">
