@@ -8,7 +8,7 @@ const Header = () => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Brain className="w-8 h-8 text-primary" />
-            <span className="text-2xl font-bold heading-gradient">StudyAI</span>
+            <span className="text-2xl font-bold heading-gradient">myTutor</span>
           </div>
         </div>
         

@@ -11,21 +11,21 @@ const Hero = () => {
           <div className="animate-fade-in">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
               <Brain className="w-4 h-4" />
-              AI-Powered Learning
+              Your Personal AI Tutor
             </div>
             
             <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 text-shadow">
-              Transform Your
+              Your Personal
               <span className="heading-gradient block">
-                Course Materials
+                AI Tutor
               </span>
-              Into Personal Tutoring
+              Adapts to You
             </h1>
             
             <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-              Upload any course material and our AI instantly creates structured lesson plans, 
-              interactive tutorials, and becomes your personal tutor available 24/7. 
-              Master any subject with personalized, adaptive learning.
+              Upload your course materials and myTutor instantly adapts to your learning style. 
+              Get personalized explanations, interactive Q&A, and study plans tailored just for you. 
+              Your AI tutor learns how you learn best, making every lesson perfectly personalized.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
