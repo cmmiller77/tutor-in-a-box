@@ -24,7 +24,9 @@ const Header = () => {
 
         <div className="flex items-center gap-4">
           <Button variant="ghost">Sign In</Button>
-          <Button variant="hero">Get Started</Button>
+          <Button variant="hero" asChild>
+            <Link to="/signup">Get Started</Link>
+          </Button>
         </div>
       </div>
     </header>

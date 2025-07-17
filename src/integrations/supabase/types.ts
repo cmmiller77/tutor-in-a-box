@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      course_materials: {
+        Row: {
+          created_at: string | null
+          file_path: string
+          file_type: string
+          id: number
+          lesson_plan: Json | null
+          processed: boolean | null
+          subject: string
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_path: string
+          file_type: string
+          id?: never
+          lesson_plan?: Json | null
+          processed?: boolean | null
+          subject: string
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_path?: string
+          file_type?: string
+          id?: never
+          lesson_plan?: Json | null
+          processed?: boolean | null
+          subject?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      "User Tables": {
+        Row: {
+          created_at: string
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
