@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -27,6 +27,26 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/");
+      }
+    };
+    checkUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigate("/");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const form = useForm<SignUpForm>({
     resolver: zodResolver(signUpSchema),
@@ -67,11 +87,12 @@ const SignUp = () => {
       } else {
         toast({
           title: "Success!",
-          description: "Please check your email to confirm your account.",
+          description: "Account created successfully! You are now signed in.",
         });
-        navigate("/");
+        // Navigation will be handled by the auth state change listener
       }
     } catch (error) {
+      console.error("Signup error:", error);
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
