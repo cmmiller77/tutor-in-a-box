@@ -1,16 +1,39 @@
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Brain } from "lucide-react"
 import { Link } from "react-router-dom"
+import { supabase } from "@/integrations/supabase/client"
+import { User } from "@supabase/supabase-js"
+import UserProfile from "@/components/UserProfile"
 
 const Header = () => {
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    // Get initial session
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
+    }
+    
+    getSession()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
   return (
     <header className="border-b border-border/50 bg-card/60 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <Brain className="w-8 h-8 text-primary" />
             <span className="text-2xl font-bold heading-gradient">myTutor</span>
-          </div>
+          </Link>
         </div>
         
         <nav className="hidden md:flex items-center gap-8">
@@ -23,10 +46,18 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-4">
-          <Button variant="ghost">Sign In</Button>
-          <Button variant="hero" asChild>
-            <Link to="/signup">Get Started</Link>
-          </Button>
+          {user ? (
+            <UserProfile user={user} />
+          ) : (
+            <>
+              <Button variant="ghost" asChild>
+                <Link to="/signin">Sign In</Link>
+              </Button>
+              <Button variant="hero" asChild>
+                <Link to="/signup">Get Started</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>
