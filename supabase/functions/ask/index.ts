@@ -47,7 +47,25 @@ serve(async (req) => {
       });
     }
 
-    const { query } = await req.json();
+    // Dual-approach request parsing to handle different client types
+    let query;
+    try {
+      const body = await req.json();
+      query = body.query;
+    } catch (jsonError) {
+      console.log('JSON parsing failed, trying text parsing:', jsonError.message);
+      try {
+        const textBody = await req.text();
+        const parsedBody = JSON.parse(textBody);
+        query = parsedBody.query;
+      } catch (textError) {
+        console.log('Text parsing also failed:', textError.message);
+        return new Response(JSON.stringify({ error: 'Invalid request body format' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     if (!query) {
       return new Response(JSON.stringify({ error: 'Query is required' }), {

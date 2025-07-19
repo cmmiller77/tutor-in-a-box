@@ -70,26 +70,52 @@ serve(async (req) => {
       const chunk = chunks[i];
       
       try {
-        // Generate embedding
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: chunk.text,
-          }),
-        });
+        console.log(`Processing chunk ${i + 1}/${chunks.length}: ${chunk.chunk_id}`);
+        
+        // Generate embedding with retry logic for rate limiting
+        let embeddingResponse;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+          attempts++;
+          console.log(`Embedding attempt ${attempts}/${maxAttempts} for chunk ${i + 1}`);
+          
+          embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: chunk.text,
+            }),
+          });
+
+          if (embeddingResponse.ok) {
+            console.log(`Successfully got embedding for chunk ${i + 1}`);
+            break;
+          } else if (embeddingResponse.status === 429) {
+            console.log(`Rate limited on attempt ${attempts}, waiting before retry...`);
+            if (attempts < maxAttempts) {
+              // Progressive backoff: 2s, 4s, 6s
+              await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
+            }
+          } else {
+            console.error(`OpenAI error for chunk ${i + 1}: ${embeddingResponse.status} ${embeddingResponse.statusText}`);
+            throw new Error(`OpenAI API error: ${embeddingResponse.status}`);
+          }
+        }
 
         if (!embeddingResponse.ok) {
-          console.error(`OpenAI error for chunk ${i}:`, embeddingResponse.status);
-          continue;
+          console.error(`Failed to get embedding for chunk ${i + 1} after ${maxAttempts} attempts`);
+          continue; // Skip this chunk but continue with others
         }
 
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data[0].embedding;
+        console.log(`Got embedding for chunk ${i + 1}, storing in database...`);
 
         // Store in database
         const { error: insertError } = await supabase
@@ -104,13 +130,13 @@ serve(async (req) => {
           });
 
         if (insertError) {
-          console.error('Database insert error:', insertError);
+          console.error(`Database insert error for chunk ${i + 1}:`, insertError);
         } else {
           successCount++;
-          console.log(`Stored chunk ${i + 1} successfully`);
+          console.log(`✅ Successfully stored chunk ${i + 1}/${chunks.length}`);
         }
       } catch (chunkError) {
-        console.error(`Error with chunk ${i}:`, chunkError.message);
+        console.error(`Error processing chunk ${i + 1}:`, chunkError.message);
       }
     }
     
