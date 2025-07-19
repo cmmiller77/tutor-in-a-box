@@ -84,56 +84,154 @@ serve(async (req) => {
 
     console.log('Processing query:', query);
 
-    // Get chunks for this user
-    const { data: userChunks, error: chunksError } = await supabase
-      .from('chunks')
-      .select('id, text, source_file, page_number, chunk_id')
-      .eq('user_id', user.id)
-      .limit(5);
-
-    console.log('Found chunks:', userChunks?.length || 0);
-
-    if (!userChunks || userChunks.length === 0) {
-      return new Response(JSON.stringify({ 
-        answer: "I don't have any uploaded course materials to answer questions about. Please upload a PDF first, then ask your question.",
-        sources: [],
-        query: query
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create context from chunks
-    const context = userChunks.map((chunk: any, index: number) => 
-      `[Source ${index + 1} - ${chunk.source_file}, Page ${chunk.page_number}]:\n${chunk.text}`
-    ).join('\n\n');
-
-    console.log('Using context from', userChunks.length, 'chunks');
-
-    // For now, provide a direct answer based on the content to avoid OpenAI rate limits
-    let answer;
-    const queryLower = query.toLowerCase();
+    // Step 1: Convert user query to embedding for similarity search
+    console.log('Converting query to embedding...');
     
-    if (queryLower.includes('calculus')) {
-      answer = `Based on your uploaded materials: Calculus is a branch of mathematics focused on limits, functions, derivatives, integrals, and infinite series. It deals with continuous change and motion, and has two main branches: differential calculus (concerning rates of change and slopes of curves) and integral calculus (concerning accumulation of quantities and areas under curves).`;
-    } else if (queryLower.includes('derivative')) {
-      answer = `Based on your uploaded materials: A derivative represents the rate at which a function changes. If f(x) is a function, then f'(x) represents its derivative. Differential calculus studies the rate at which quantities change. The derivative of x^n is n*x^(n-1).`;
-    } else if (queryLower.includes('limit')) {
-      answer = `Based on your uploaded materials: Limits are fundamental to calculus and deal with the behavior of functions as they approach specific values. They form the foundation for understanding derivatives and integrals in calculus.`;
-    } else if (queryLower.includes('integral')) {
-      answer = `Based on your uploaded materials: Integration is the reverse process of differentiation. The integral of a function f(x) gives us the area under the curve. Integral calculus concerns the accumulation of quantities and areas under curves.`;
-    } else {
-      answer = `Based on your uploaded course materials, I can answer questions about calculus, derivatives, limits, and integrals. Here's what I found in your materials:\n\n${context}\n\nPlease ask a more specific question about these topics.`;
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: query,
+      }),
+    });
+
+    if (!embeddingResponse.ok) {
+      console.log('ERROR: OpenAI embedding failed:', embeddingResponse.status);
+      throw new Error(`OpenAI embedding error: ${embeddingResponse.statusText}`);
     }
 
-    console.log('Generated answer based on uploaded content');
+    const embeddingData = await embeddingResponse.json();
+    const queryEmbedding = embeddingData.data[0].embedding;
+    
+    console.log('Query embedding generated, searching for similar chunks...');
 
-    // Format sources
-    const sources = userChunks.map((chunk: any, index: number) => ({
+    // Step 2: Use vector similarity search to find relevant chunks
+    const { data: similarChunks, error: searchError } = await supabase
+      .rpc('match_chunks', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.1, // Lower threshold to get more potentially relevant content
+        match_count: 15, // Get more chunks for better context
+        user_id: user.id
+      });
+
+    if (searchError) {
+      console.log('ERROR: Vector search failed:', searchError);
+      throw new Error('Failed to search course material');
+    }
+
+    if (!similarChunks || similarChunks.length === 0) {
+      console.log('No relevant chunks found for query');
+      return new Response(
+        JSON.stringify({ 
+          answer: 'I could not find relevant information in your uploaded materials to answer this question. Please make sure you have uploaded course materials related to your question.',
+          sources: [],
+          query: query
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log(`Found ${similarChunks.length} relevant chunks with similarity scores`);
+
+    // Step 3: Create rich context from the most relevant chunks
+    const context = similarChunks
+      .map((chunk: any, index: number) => 
+        `[Source ${index + 1}] ${chunk.source_file} (Page ${chunk.page_number}) - Similarity: ${(chunk.similarity * 100).toFixed(1)}%\n${chunk.text}`
+      )
+      .join('\n\n---\n\n');
+
+    console.log('Assembled context from', similarChunks.length, 'chunks');
+
+    // Step 4: Generate comprehensive answer using OpenAI with proper context
+    const systemPrompt = `You are an AI tutor and subject matter expert. You have been provided with excerpts from the student's course materials. Your job is to:
+
+1. Answer questions based ONLY on the provided course material context
+2. Be comprehensive and educational in your explanations  
+3. Reference specific sources and page numbers when possible
+4. If the context doesn't contain enough information, say so clearly
+5. Maintain an encouraging, educational tone
+6. Break down complex concepts into understandable parts
+
+Remember: You are an expert on THIS specific course material, not general knowledge.`;
+
+    const userPrompt = `Based on the following excerpts from my course materials, please answer my question comprehensively:
+
+COURSE MATERIAL CONTEXT:
+${context}
+
+MY QUESTION: ${query}
+
+Please provide a detailed answer based on the course materials above, and reference the sources when possible.`;
+
+    console.log('Generating AI response...');
+
+    const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: userPrompt
+          }
+        ],
+        temperature: 0.3, // Lower temperature for more focused, educational responses
+        max_tokens: 1500, // More tokens for comprehensive answers
+      }),
+    });
+
+    if (!chatResponse.ok) {
+      console.log('ERROR: OpenAI chat completion failed:', chatResponse.status);
+      const errorText = await chatResponse.text();
+      console.log('OpenAI error details:', errorText);
+      
+      // Fallback to a basic response if OpenAI fails
+      const fallbackAnswer = `Based on your course materials, here's what I found:\n\n${context.slice(0, 1000)}...\n\nI'm having trouble generating a detailed response right now, but the above content from your materials should help answer your question about: ${query}`;
+      
+      return new Response(
+        JSON.stringify({ 
+          answer: fallbackAnswer,
+          sources: similarChunks.map((chunk: any, index: number) => ({
+            id: index + 1,
+            source_file: chunk.source_file,
+            page_number: chunk.page_number,
+            chunk_id: chunk.chunk_id,
+            similarity: chunk.similarity
+          })),
+          query: query
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const chatData = await chatResponse.json();
+    const answer = chatData.choices[0].message.content;
+
+    console.log('Generated comprehensive AI answer based on course materials');
+
+    // Format sources with similarity scores
+    const sources = similarChunks.map((chunk: any, index: number) => ({
       id: index + 1,
       source_file: chunk.source_file,
       page_number: chunk.page_number || 1,
-      chunk_id: chunk.chunk_id
+      chunk_id: chunk.chunk_id,
+      similarity: chunk.similarity
     }));
 
     const result = {
