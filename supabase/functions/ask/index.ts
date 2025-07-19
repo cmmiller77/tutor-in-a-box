@@ -135,11 +135,13 @@ serve(async (req) => {
     if (!queryEmbedding) {
       console.log('Failed to get embedding after retries, falling back to keyword search');
       // Fallback: simple text search without embeddings
+      // Clean the query for PostgreSQL text search by removing special characters
+      const cleanQuery = query.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
       const { data: keywordChunks, error: keywordError } = await supabase
         .from('chunks')
         .select('*')
         .eq('user_id', user.id)
-        .textSearch('text', query)
+        .textSearch('text', cleanQuery || 'content')
         .limit(10);
         
       if (keywordError) {
