@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UploadSection from "@/components/UploadSection";
+import AITutor from "@/components/AITutor";
+import FlashcardViewer from "@/components/FlashcardViewer";
 import Header from "@/components/Header";
 
 const Dashboard = () => {
@@ -43,16 +46,37 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold heading-gradient mb-6">
-            Upload Your Textbook
-          </h1>
-          <p className="text-xl text-muted-foreground">
-            Get started by uploading your course materials. Our AI will analyze them and create personalized learning content for you.
-          </p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl md:text-5xl font-bold heading-gradient mb-4">
+              Your Learning Dashboard
+            </h1>
+            <p className="text-xl text-muted-foreground">
+              Upload, learn, and master your course materials with AI
+            </p>
+          </div>
+
+          <Tabs defaultValue="upload" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-8">
+              <TabsTrigger value="upload">Upload Materials</TabsTrigger>
+              <TabsTrigger value="tutor">AI Tutor</TabsTrigger>
+              <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="upload" className="space-y-6">
+              <UploadSection />
+            </TabsContent>
+
+            <TabsContent value="tutor" className="space-y-6">
+              <AITutor />
+            </TabsContent>
+
+            <TabsContent value="flashcards" className="space-y-6">
+              <FlashcardViewer />
+            </TabsContent>
+          </Tabs>
         </div>
-        <UploadSection />
       </div>
     </div>
   );

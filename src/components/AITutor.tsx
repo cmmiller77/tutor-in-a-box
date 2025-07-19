@@ -1,161 +1,186 @@
 import { useState } from "react"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Send, MessageCircle, Sparkles } from "lucide-react"
-import tutorIcon from "@/assets/tutor-icon.jpg"
+import { MessageSquare, Loader2, Send } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { supabase } from "@/integrations/supabase/client"
+
+interface Source {
+  id: number
+  source_file: string
+  page_number: number
+  chunk_id: string
+}
+
+interface QAResult {
+  answer: string
+  sources: Source[]
+  query: string
+}
 
 const AITutor = () => {
-  const [message, setMessage] = useState("")
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "ai" as const,
-      content: "Hello! I'm your AI tutor for Quantum Physics. I've analyzed your course materials and I'm ready to help you understand any concepts. What would you like to explore first?",
-      timestamp: "2 minutes ago"
-    },
-    {
-      id: 2,
-      type: "user" as const,
-      content: "Can you explain wave-particle duality in simple terms?",
-      timestamp: "1 minute ago"
-    },
-    {
-      id: 3,
-      type: "ai" as const,
-      content: "Great question! Wave-particle duality means that light and matter can behave both like waves and particles, depending on how we observe them. Think of it like this: imagine you're looking at water - sometimes you see individual droplets (particles), other times you see flowing waves. Electrons and photons work similarly! Would you like me to explain the famous double-slit experiment that demonstrates this?",
-      timestamp: "Just now"
-    }
-  ])
+  const [question, setQuestion] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [conversation, setConversation] = useState<QAResult[]>([])
+  const { toast } = useToast()
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      // Add user message
-      const newMessage = {
-        id: messages.length + 1,
-        type: "user" as const,
-        content: message,
-        timestamp: "Just now"
-      }
-      setMessages([...messages, newMessage])
-      setMessage("")
+  const askQuestion = async () => {
+    if (!question.trim()) {
+      toast({
+        title: "Please enter a question",
+        description: "Type your question about the uploaded course material.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setLoading(true)
       
-      // Simulate AI response
-      setTimeout(() => {
-        const aiResponse = {
-          id: messages.length + 2,
-          type: "ai" as const,
-          content: "That's an excellent question! Let me break that down for you based on your course materials...",
-          timestamp: "Just now"
-        }
-        setMessages(prev => [...prev, aiResponse])
-      }, 1000)
+      // Get the session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        throw new Error('Please sign in to ask questions')
+      }
+
+      const response = await supabase.functions.invoke('ask', {
+        body: JSON.stringify({ query: question }),
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to get answer')
+      }
+
+      const result = response.data as QAResult
+      setConversation(prev => [...prev, result])
+      setQuestion("")
+
+      toast({
+        title: "Question answered",
+        description: "Check the response below.",
+      })
+
+    } catch (error) {
+      console.error('Error asking question:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to get answer",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const suggestedQuestions = [
-    "Explain quantum entanglement",
-    "What is Schrödinger's equation?",
-    "How does quantum tunneling work?",
-    "Practice problems for uncertainty principle"
-  ]
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      askQuestion()
+    }
+  }
 
   return (
-    <section className="py-16 bg-gradient-to-bl from-accent/5 to-primary/5">
-      <div className="container mx-auto px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <img src={tutorIcon} alt="AI Tutor" className="w-16 h-16 rounded-full" />
-              <div>
-                <h2 className="text-3xl md:text-4xl font-bold heading-gradient">
-                  Your AI Tutor
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  Ask me anything about your course materials
-                </p>
-              </div>
-            </div>
-          </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="text-center mb-8">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <MessageSquare className="w-8 h-8 text-primary" />
+          <h2 className="text-3xl font-bold heading-gradient">AI Tutor</h2>
+        </div>
+        <p className="text-lg text-muted-foreground">
+          Ask questions about your uploaded course materials and get AI-powered answers
+        </p>
+      </div>
 
-          <Card className="lesson-card mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold">Physics Expert Mode</h3>
-                <Badge variant="secondary" className="bg-primary/10 text-primary">
-                  <MessageCircle className="w-3 h-3 mr-1" />
-                  Active
-                </Badge>
-              </div>
-            </div>
-
-            <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex gap-3 ${msg.type === 'user' ? 'justify-end' : ''}`}
-                >
-                  {msg.type === 'ai' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  <div
-                    className={`p-4 rounded-lg max-w-[80%] ${
-                      msg.type === 'user'
-                        ? 'bg-primary text-primary-foreground ml-auto'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    <p className="text-sm">{msg.content}</p>
-                    <p className="text-xs opacity-70 mt-2">{msg.timestamp}</p>
-                  </div>
-                  {msg.type === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-medium">You</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <Input
-                placeholder="Ask your AI tutor anything..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="flex-1"
-              />
-              <Button variant="hero" onClick={handleSendMessage}>
+      {/* Question Input */}
+      <Card className="p-6">
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <Input
+              placeholder="Ask a question about your course material..."
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={loading}
+              className="flex-1"
+            />
+            <Button 
+              onClick={askQuestion} 
+              disabled={loading || !question.trim()}
+              size="icon"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
                 <Send className="w-4 h-4" />
-              </Button>
+              )}
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Press Enter to send or Shift+Enter for new line
+          </p>
+        </div>
+      </Card>
+
+      {/* Conversation History */}
+      <div className="space-y-6">
+        {conversation.length === 0 ? (
+          <Card className="p-8 text-center">
+            <div className="text-muted-foreground">
+              <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No questions asked yet. Upload a PDF and start asking questions!</p>
             </div>
           </Card>
+        ) : (
+          conversation.map((qa, index) => (
+            <div key={index} className="space-y-4">
+              {/* Question */}
+              <Card className="p-4 bg-primary/5 border-primary/20">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                    <MessageSquare className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm text-muted-foreground mb-1">You asked:</p>
+                    <p className="text-foreground">{qa.query}</p>
+                  </div>
+                </div>
+              </Card>
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-center">Suggested Questions</h3>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {suggestedQuestions.map((question, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  className="text-left p-4 h-auto hover:bg-primary/5 hover:border-primary/30"
-                  onClick={() => setMessage(question)}
-                >
-                  <MessageCircle className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span className="text-sm">{question}</span>
-                </Button>
-              ))}
+              {/* Answer */}
+              <Card className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-1">
+                    <MessageSquare className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm text-muted-foreground mb-1">AI Tutor:</p>
+                    <div className="text-foreground whitespace-pre-wrap mb-4">{qa.answer}</div>
+                    
+                    {qa.sources.length > 0 && (
+                      <div className="border-t pt-4">
+                        <p className="font-medium text-sm text-muted-foreground mb-2">Sources:</p>
+                        <div className="space-y-1">
+                          {qa.sources.map((source) => (
+                            <div key={source.id} className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                              📄 {source.source_file} (Page {source.page_number})
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
             </div>
-          </div>
-        </div>
+          ))
+        )}
       </div>
-    </section>
+    </div>
   )
 }
 
