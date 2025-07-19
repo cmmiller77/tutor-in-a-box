@@ -1,1 +1,13 @@
 project_id = "kxglxdeqxadiqxkcjblf"
+
+[functions.upload-pdf]
+verify_jwt = true
+
+[functions.process-pdf]
+verify_jwt = true
+
+[functions.ask]
+verify_jwt = true
+
+[functions.generate-flashcards]
+verify_jwt = true
