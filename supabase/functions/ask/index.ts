@@ -8,14 +8,20 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('=== ASK FUNCTION DEBUG START ===');
+  console.log('Request method:', req.method);
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
+      console.log('Missing OpenAI API key');
       return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -30,33 +36,42 @@ serve(async (req) => {
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.log('Missing authorization header');
       return new Response(JSON.stringify({ error: 'No authorization header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    console.log('Auth header present, verifying user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
 
     if (authError || !user) {
+      console.log('Auth error:', authError);
       return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Dual-approach request parsing to handle different client types
+    console.log('User authenticated:', user.id);
+
+    // Parse request body
     let query;
     try {
+      console.log('Attempting to parse request body...');
       const body = await req.json();
+      console.log('Parsed body:', body);
       query = body.query;
     } catch (jsonError) {
-      console.log('JSON parsing failed, trying text parsing:', jsonError.message);
+      console.log('JSON parsing failed:', jsonError.message);
       try {
         const textBody = await req.text();
+        console.log('Text body:', textBody);
         const parsedBody = JSON.parse(textBody);
+        console.log('Parsed from text:', parsedBody);
         query = parsedBody.query;
       } catch (textError) {
         console.log('Text parsing also failed:', textError.message);
