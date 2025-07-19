@@ -116,7 +116,22 @@ serve(async (req) => {
     console.log('Parsing request body...');
     let requestData;
     try {
-      requestData = await req.json();
+      // The Supabase client sends the body as JSON when using supabase.functions.invoke
+      const contentType = req.headers.get('content-type') || '';
+      console.log('Content-Type:', contentType);
+      
+      if (contentType.includes('application/json')) {
+        requestData = await req.json();
+      } else {
+        // Fallback: try to parse as text first, then JSON
+        const text = await req.text();
+        console.log('Raw request body:', text);
+        if (text.trim()) {
+          requestData = JSON.parse(text);
+        } else {
+          throw new Error('Empty request body');
+        }
+      }
       console.log('Request data received:', requestData);
     } catch (parseError) {
       console.error('JSON parsing failed:', parseError);
