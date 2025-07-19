@@ -16,21 +16,32 @@ serve(async (req) => {
   }
 
   try {
-    // Step 1: Read and parse request safely
+    // Step 1: Read request data - try multiple approaches
     console.log('Step 1: Reading request...');
-    const body = await req.text();
-    console.log('Body received, length:', body.length);
-    
     let requestData;
-    if (body.trim()) {
+    
+    // First try: direct JSON parsing (works with Supabase client)
+    try {
+      requestData = await req.json();
+      console.log('Method 1 (req.json) succeeded:', requestData);
+    } catch (jsonError) {
+      console.log('Method 1 failed, trying text approach...');
+      
+      // Second try: text then parse
       try {
+        const body = await req.text();
+        console.log('Body from text method:', body);
+        
+        if (!body.trim()) {
+          throw new Error('Empty request body from both methods');
+        }
+        
         requestData = JSON.parse(body);
-        console.log('Request parsed:', requestData);
-      } catch (e) {
-        throw new Error('Invalid JSON format');
+        console.log('Method 2 (text + parse) succeeded:', requestData);
+      } catch (textError) {
+        console.error('Both methods failed:', jsonError.message, textError.message);
+        throw new Error('Could not parse request body');
       }
-    } else {
-      throw new Error('Empty request body');
     }
     
     const { filePath, filename } = requestData;
