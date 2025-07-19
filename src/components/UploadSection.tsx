@@ -105,10 +105,10 @@ const UploadSection = () => {
 
       // Process PDF
       const processResponse = await supabase.functions.invoke('process-pdf', {
-        body: JSON.stringify({
+        body: {
           filePath: uploadData.filePath,
           filename: file.name
-        }),
+        },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
