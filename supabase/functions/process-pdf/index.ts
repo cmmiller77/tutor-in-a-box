@@ -104,7 +104,23 @@ serve(async (req) => {
       });
     }
 
-    const { filePath, filename } = await req.json();
+    // Parse request body with error handling
+    let requestBody;
+    try {
+      const bodyText = await req.text();
+      if (!bodyText.trim()) {
+        throw new Error('Empty request body');
+      }
+      requestBody = JSON.parse(bodyText);
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { filePath, filename } = requestBody;
 
     if (!filePath) {
       return new Response(JSON.stringify({ error: 'File path is required' }), {
