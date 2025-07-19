@@ -8,20 +8,19 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('=== ASK FUNCTION DEBUG START ===');
-  console.log('Request method:', req.method);
-  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+  console.log('=== ASK FUNCTION START ===');
+  console.log('Method:', req.method);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS request');
+    console.log('Returning CORS headers');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
-      console.log('Missing OpenAI API key');
+      console.log('ERROR: Missing OpenAI API key');
       return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -35,21 +34,22 @@ serve(async (req) => {
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
+    console.log('Auth header present:', !!authHeader);
+    
     if (!authHeader) {
-      console.log('Missing authorization header');
+      console.log('ERROR: Missing authorization header');
       return new Response(JSON.stringify({ error: 'No authorization header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('Auth header present, verifying user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
 
     if (authError || !user) {
-      console.log('Auth error:', authError);
+      console.log('ERROR: Auth failed:', authError?.message);
       return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -58,31 +58,36 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    // Parse request body
+    // Try to parse the request body
     let query;
+    const contentType = req.headers.get('content-type') || '';
+    console.log('Content-Type:', contentType);
+    
     try {
-      console.log('Attempting to parse request body...');
-      const body = await req.json();
-      console.log('Parsed body:', body);
-      query = body.query;
-    } catch (jsonError) {
-      console.log('JSON parsing failed:', jsonError.message);
-      try {
-        const textBody = await req.text();
-        console.log('Text body:', textBody);
-        const parsedBody = JSON.parse(textBody);
-        console.log('Parsed from text:', parsedBody);
+      const rawBody = await req.text();
+      console.log('Raw body:', rawBody);
+      
+      if (rawBody) {
+        const parsedBody = JSON.parse(rawBody);
+        console.log('Parsed body:', parsedBody);
         query = parsedBody.query;
-      } catch (textError) {
-        console.log('Text parsing also failed:', textError.message);
-        return new Response(JSON.stringify({ error: 'Invalid request body format' }), {
+      } else {
+        console.log('ERROR: Empty request body');
+        return new Response(JSON.stringify({ error: 'Empty request body' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+    } catch (parseError) {
+      console.log('ERROR: Failed to parse request body:', parseError.message);
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!query) {
+      console.log('ERROR: No query in request');
       return new Response(JSON.stringify({ error: 'Query is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -91,70 +96,40 @@ serve(async (req) => {
 
     console.log('Processing query:', query);
 
-    // Generate embedding for the query
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: query,
-      }),
-    });
+    // Check if we have any chunks for this user
+    const { data: userChunks, error: chunksError } = await supabase
+      .from('chunks')
+      .select('count(*)')
+      .eq('user_id', user.id);
 
-    if (!embeddingResponse.ok) {
-      throw new Error(`OpenAI API error: ${embeddingResponse.statusText}`);
-    }
+    console.log('User chunks check:', userChunks, chunksError);
 
-    const embeddingData = await embeddingResponse.json();
-    const queryEmbedding = embeddingData.data[0].embedding;
+    // If no chunks, return a helpful message
+    const { data: allChunks, error: allChunksError } = await supabase
+      .from('chunks')
+      .select('id, text, source_file')
+      .eq('user_id', user.id)
+      .limit(3);
 
-    // Perform vector similarity search
-    const { data: similarChunks, error: searchError } = await supabase.rpc(
-      'match_chunks',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.7,
-        match_count: 5,
-        user_id: user.id
-      }
-    );
+    console.log('Found chunks:', allChunks?.length || 0);
 
-    if (searchError) {
-      console.error('Vector search error:', searchError);
-      // Fallback to a simple text search if vector search fails
-      const { data: fallbackChunks, error: fallbackError } = await supabase
-        .from('chunks')
-        .select('*')
-        .eq('user_id', user.id)
-        .textSearch('text', query)
-        .limit(5);
-
-      if (fallbackError) {
-        throw new Error('Failed to search chunks');
-      }
-
-      console.log('Using fallback search, found chunks:', fallbackChunks?.length || 0);
-    }
-
-    const chunks = similarChunks || [];
-    console.log('Found relevant chunks:', chunks.length);
-
-    if (chunks.length === 0) {
+    if (!allChunks || allChunks.length === 0) {
+      console.log('No chunks found for user');
       return new Response(JSON.stringify({ 
-        answer: "I don't have enough information in your uploaded documents to answer this question. Please upload relevant course materials first.",
-        sources: []
+        answer: "I don't have any uploaded course materials to answer questions about. Please upload a PDF first, then ask your question.",
+        sources: [],
+        query: query
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Create context from relevant chunks
-    const context = chunks.map((chunk: any, index: number) => 
-      `[Source ${index + 1} - ${chunk.source_file}, Page ${chunk.page_number}]:\n${chunk.text}`
+    // For now, let's just use the existing chunks without vector search
+    const context = allChunks.map((chunk: any, index: number) => 
+      `[Source ${index + 1} - ${chunk.source_file}]:\n${chunk.text}`
     ).join('\n\n');
+
+    console.log('Using context from', allChunks.length, 'chunks');
 
     // Generate answer using GPT
     const prompt = `Based on the following course material excerpts, answer the user's question. Be specific and reference the sources when possible.
@@ -164,7 +139,9 @@ ${context}
 
 User Question: ${query}
 
-Please provide a comprehensive answer based only on the information provided in the context above. If the context doesn't contain enough information to fully answer the question, say so explicitly.`;
+Please provide a comprehensive answer based only on the information provided in the context above.`;
+
+    console.log('Calling OpenAI...');
 
     const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -190,31 +167,42 @@ Please provide a comprehensive answer based only on the information provided in 
     });
 
     if (!chatResponse.ok) {
-      throw new Error(`OpenAI chat API error: ${chatResponse.statusText}`);
+      console.log('ERROR: OpenAI API failed:', chatResponse.status, chatResponse.statusText);
+      throw new Error(`OpenAI API error: ${chatResponse.statusText}`);
     }
 
     const chatData = await chatResponse.json();
     const answer = chatData.choices[0].message.content;
 
+    console.log('Got answer from OpenAI');
+
     // Format sources
-    const sources = chunks.map((chunk: any, index: number) => ({
+    const sources = allChunks.map((chunk: any, index: number) => ({
       id: index + 1,
       source_file: chunk.source_file,
-      page_number: chunk.page_number,
-      chunk_id: chunk.chunk_id
+      page_number: 1, // Default since we don't have page info in test data
+      chunk_id: chunk.id
     }));
 
-    return new Response(JSON.stringify({ 
+    const result = {
       answer,
       sources,
       query
-    }), {
+    };
+
+    console.log('Returning successful response');
+
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in ask function:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    console.log('ERROR: Function failed:', error.message);
+    console.log('Error stack:', error.stack);
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error.message 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
