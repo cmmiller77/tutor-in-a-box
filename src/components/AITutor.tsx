@@ -45,11 +45,7 @@ const AITutor = () => {
       }
 
       const response = await supabase.functions.invoke('ask', {
-        body: { query: question }, // Don't JSON.stringify - supabase.functions.invoke handles this
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        body: { query: question }
       })
 
       if (response.error) {
