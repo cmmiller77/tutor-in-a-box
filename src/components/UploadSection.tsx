@@ -116,6 +116,8 @@ const UploadSection = () => {
       })
 
       if (processResponse.error) {
+        console.error('Process response error:', processResponse.error)
+        console.error('Process response data:', processResponse.data)
         throw new Error(processResponse.error.message || 'Failed to process PDF')
       }
 

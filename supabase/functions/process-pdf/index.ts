@@ -47,8 +47,13 @@ const extractTextFromPDF = async (pdfBuffer: ArrayBuffer, filename: string): Pro
 };
 
 serve(async (req) => {
+  console.log('=== PROCESS-PDF FUNCTION STARTED ===');
+  console.log('Method:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -86,7 +91,22 @@ serve(async (req) => {
       });
     }
 
-    const { filePath, filename } = await req.json();
+    console.log('Attempting to parse request body...');
+    let requestData;
+    try {
+      requestData = await req.json();
+      console.log('Request data received:', requestData);
+    } catch (parseError) {
+      console.error('JSON parsing failed:', parseError);
+      const text = await req.text();
+      console.log('Raw request body:', text);
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const { filePath, filename } = requestData;
 
     if (!filePath) {
       return new Response(JSON.stringify({ error: 'File path is required' }), {
