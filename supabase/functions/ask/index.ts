@@ -87,25 +87,107 @@ serve(async (req) => {
     // Step 1: Convert user query to embedding for similarity search
     console.log('Converting query to embedding...');
     
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: query,
-      }),
-    });
+    let queryEmbedding;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: query,
+          }),
+        });
 
-    if (!embeddingResponse.ok) {
-      console.log('ERROR: OpenAI embedding failed:', embeddingResponse.status);
-      throw new Error(`OpenAI embedding error: ${embeddingResponse.statusText}`);
+        if (embeddingResponse.ok) {
+          const embeddingData = await embeddingResponse.json();
+          queryEmbedding = embeddingData.data[0].embedding;
+          break;
+        } else if (embeddingResponse.status === 429) {
+          retryCount++;
+          console.log(`Rate limited, attempt ${retryCount}/${maxRetries}`);
+          if (retryCount < maxRetries) {
+            const waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff
+            console.log(`Waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        } else {
+          console.log('ERROR: OpenAI embedding failed:', embeddingResponse.status);
+          throw new Error(`OpenAI embedding error: ${embeddingResponse.statusText}`);
+        }
+      } catch (error) {
+        console.log('ERROR: Network error during embedding:', error);
+        retryCount++;
+        if (retryCount < maxRetries) {
+          const waitTime = Math.pow(2, retryCount) * 1000;
+          console.log(`Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
     }
 
-    const embeddingData = await embeddingResponse.json();
-    const queryEmbedding = embeddingData.data[0].embedding;
+    if (!queryEmbedding) {
+      console.log('Failed to get embedding after retries, falling back to keyword search');
+      // Fallback: simple text search without embeddings
+      const { data: keywordChunks, error: keywordError } = await supabase
+        .from('chunks')
+        .select('*')
+        .eq('user_id', user.id)
+        .textSearch('text', query)
+        .limit(10);
+        
+      if (keywordError) {
+        console.log('ERROR: Keyword search failed:', keywordError);
+        throw new Error('Failed to search course material');
+      }
+
+      if (!keywordChunks || keywordChunks.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            answer: 'I could not find relevant information in your uploaded materials to answer this question. Please make sure you have uploaded course materials related to your question.',
+            sources: [],
+            query: query
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Use keyword-matched chunks for context
+      const context = keywordChunks
+        .map((chunk: any, index: number) => 
+          `[Source ${index + 1}] ${chunk.source_file} (Page ${chunk.page_number})\n${chunk.text}`
+        )
+        .join('\n\n---\n\n');
+
+      console.log('Using keyword search context from', keywordChunks.length, 'chunks');
+
+      // Generate answer with keyword-matched context
+      const answer = `Based on your course materials, here's what I found regarding "${query}":\n\n${context.slice(0, 1500)}...\n\nPlease note: This response uses keyword matching due to temporary limitations. For more precise answers, please try again later.`;
+      
+      return new Response(
+        JSON.stringify({ 
+          answer,
+          sources: keywordChunks.map((chunk: any, index: number) => ({
+            id: index + 1,
+            source_file: chunk.source_file,
+            page_number: chunk.page_number || 1,
+            chunk_id: chunk.chunk_id
+          })),
+          query: query
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
     
     console.log('Query embedding generated, searching for similar chunks...');
 
