@@ -134,15 +134,21 @@ serve(async (req) => {
 
     if (!queryEmbedding) {
       console.log('Failed to get embedding after retries, falling back to keyword search');
-      // Fallback: simple text search without embeddings
-      // Clean the query for PostgreSQL text search by removing special characters
-      const cleanQuery = query.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
-      const { data: keywordChunks, error: keywordError } = await supabase
-        .from('chunks')
-        .select('*')
-        .eq('user_id', user.id)
-        .textSearch('text', cleanQuery || 'content')
-        .limit(10);
+      // Fallback: simple text search using ilike instead of textSearch
+      const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 2);
+      let keywordChunks = [];
+      let keywordError = null;
+      
+      if (searchTerms.length > 0) {
+        const { data, error } = await supabase
+          .from('chunks')
+          .select('*')
+          .eq('user_id', user.id)
+          .ilike('text', `%${searchTerms[0]}%`)
+          .limit(10);
+        keywordChunks = data;
+        keywordError = error;
+      }
         
       if (keywordError) {
         console.log('ERROR: Keyword search failed:', keywordError);
