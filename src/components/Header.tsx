@@ -36,14 +36,16 @@ const Header = () => {
           </Link>
         </div>
         
-        <nav className="hidden md:flex items-center gap-8">
-          <Link to="/how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
-            How it Works
-          </Link>
-          <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-            Pricing
-          </Link>
-        </nav>
+        {!user && (
+          <nav className="hidden md:flex items-center gap-8">
+            <Link to="/how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
+              How it Works
+            </Link>
+            <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+              Pricing
+            </Link>
+          </nav>
+        )}
 
         <div className="flex items-center gap-4">
           {user ? (
