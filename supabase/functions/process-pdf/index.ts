@@ -17,10 +17,24 @@ serve(async (req) => {
   }
 
   try {
-    // Step 1: Parse request body
+    // Step 1: Parse request body safely
     console.log('Step 1: Parsing request body...');
-    const requestData = await req.json();
-    console.log('Request data received:', requestData);
+    let requestData;
+    
+    const requestBody = await req.text();
+    console.log('Raw request body:', requestBody);
+    
+    if (!requestBody.trim()) {
+      throw new Error('Empty request body');
+    }
+    
+    try {
+      requestData = JSON.parse(requestBody);
+      console.log('Request data parsed successfully:', requestData);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      throw new Error('Invalid JSON format');
+    }
     
     const { filePath, filename } = requestData;
     if (!filePath) {
