@@ -53,11 +53,11 @@ const UploadSection = () => {
       return
     }
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
+    // Validate file size (max 20MB)
+    if (file.size > 20 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Please upload a file smaller than 10MB.",
+        description: "Please upload a file smaller than 20MB.",
         variant: "destructive",
       })
       return
@@ -233,7 +233,7 @@ const UploadSection = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
-                    <span>Max 10MB</span>
+                    <span>Max 20MB</span>
                   </div>
                 </div>
               )}
