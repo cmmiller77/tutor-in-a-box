@@ -8,6 +8,9 @@ import HowItWorks from "./pages/HowItWorks";
 import Pricing from "./pages/Pricing";
 import SignUp from "./pages/SignUp";
 import SignIn from "./pages/SignIn";
+import RoleSelection from "./pages/RoleSelection";
+import TeacherDashboard from "./pages/TeacherDashboard";
+import StudentDashboard from "./pages/StudentDashboard";
 import Dashboard from "./pages/Dashboard";
 import AITutorDashboard from "./pages/AITutorDashboard";
 import NotFound from "./pages/NotFound";
@@ -26,6 +29,9 @@ const App = () => (
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
+          <Route path="/role-selection" element={<RoleSelection />} />
+          <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+          <Route path="/student-dashboard" element={<StudentDashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/ai-tutor" element={<AITutorDashboard />} />
           <Route path="*" element={<NotFound />} />
