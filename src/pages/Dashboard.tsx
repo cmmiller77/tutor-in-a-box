@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UploadSection from "@/components/UploadSection";
 import AITutor from "@/components/AITutor";
-import FlashcardViewer from "@/components/FlashcardViewer";
+
 import Header from "@/components/Header";
 
 const Dashboard = () => {
@@ -58,10 +58,9 @@ const Dashboard = () => {
           </div>
 
           <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="upload">Upload Materials</TabsTrigger>
               <TabsTrigger value="tutor">AI Tutor</TabsTrigger>
-              <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="space-y-6">
@@ -70,10 +69,6 @@ const Dashboard = () => {
 
             <TabsContent value="tutor" className="space-y-6">
               <AITutor />
-            </TabsContent>
-
-            <TabsContent value="flashcards" className="space-y-6">
-              <FlashcardViewer />
             </TabsContent>
           </Tabs>
         </div>
