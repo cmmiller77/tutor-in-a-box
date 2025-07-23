@@ -36,6 +36,19 @@ const Header = () => {
           </Link>
         </div>
         
+        {user && (
+          <nav className="hidden md:flex items-center gap-6">
+            <Link to="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              Materials
+            </Link>
+            <Link to="/ai-tutor" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+              <Brain className="w-4 h-4" />
+              AI Tutor
+            </Link>
+          </nav>
+        )}
+        
         {!user && (
           <nav className="hidden md:flex items-center gap-8">
             <Link to="/how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">

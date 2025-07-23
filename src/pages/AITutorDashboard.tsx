@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import UploadSection from "@/components/UploadSection";
+import AITutor from "@/components/AITutor";
 import Header from "@/components/Header";
 
-const Dashboard = () => {
+const AITutorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -47,18 +47,18 @@ const Dashboard = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold heading-gradient mb-4">
-              Course Material Dashboard
+              AI Course Tutor
             </h1>
             <p className="text-xl text-muted-foreground">
-              Upload and manage your course materials for AI training
+              Ask questions about your course materials and get expert answers
             </p>
           </div>
 
-          <UploadSection />
+          <AITutor />
         </div>
       </div>
     </div>
   );
 };
 
-export default Dashboard;
+export default AITutorDashboard;
