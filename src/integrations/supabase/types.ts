@@ -50,6 +50,39 @@ export type Database = {
         }
         Relationships: []
       }
+      classes: {
+        Row: {
+          class_code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          subject: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          subject: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          class_code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          subject?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       course_materials: {
         Row: {
           created_at: string | null
@@ -88,6 +121,35 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      enrollments: {
+        Row: {
+          class_id: string
+          enrolled_at: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          class_id: string
+          enrolled_at?: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          class_id?: string
+          enrolled_at?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -148,6 +210,10 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
+      }
+      generate_class_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       halfvec_avg: {
         Args: { "": number[] }
