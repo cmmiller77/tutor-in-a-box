@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, BookOpen, Users } from "lucide-react";
+import { Plus, BookOpen, Users, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -16,6 +16,7 @@ interface ClassItem {
   subject: string;
   description?: string;
   student_count: number;
+  class_code: string;
 }
 
 const TeacherDashboard = () => {
@@ -63,11 +64,40 @@ const TeacherDashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Mock data for now - replace with actual database query later
-      setClasses([
-        { id: "1", name: "Introduction to Biology", subject: "Biology", student_count: 25 },
-        { id: "2", name: "Advanced Mathematics", subject: "Mathematics", student_count: 18 },
-      ]);
+      // Fetch classes from database
+      const { data: classesData, error } = await supabase
+        .from('classes')
+        .select(`
+          id,
+          name,
+          subject,
+          description,
+          class_code,
+          enrollments(count)
+        `)
+        .eq('teacher_id', session.user.id);
+
+      if (error) {
+        console.error("Error fetching classes:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load classes.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Transform data to include student count
+      const transformedClasses = classesData?.map((classItem: any) => ({
+        id: classItem.id,
+        name: classItem.name,
+        subject: classItem.subject,
+        description: classItem.description,
+        class_code: classItem.class_code,
+        student_count: classItem.enrollments?.length || 0,
+      })) || [];
+
+      setClasses(transformedClasses);
     } catch (error) {
       console.error("Error fetching classes:", error);
     } finally {
@@ -88,26 +118,50 @@ const TeacherDashboard = () => {
     setCreateLoading(true);
     
     try {
-      // Mock creation for now - replace with actual database insert later
-      const mockClass: ClassItem = {
-        id: Date.now().toString(),
-        name: newClass.name,
-        subject: newClass.subject,
-        description: newClass.description,
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Generate a unique class code
+      const { data: classCode, error: codeError } = await supabase.rpc('generate_class_code');
+      if (codeError) {
+        throw codeError;
+      }
+
+      // Insert new class into database
+      const { data: newClassData, error } = await supabase
+        .from('classes')
+        .insert({
+          teacher_id: session.user.id,
+          name: newClass.name,
+          subject: newClass.subject,
+          description: newClass.description || null,
+          class_code: classCode
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Add the new class to the UI
+      const newClassItem: ClassItem = {
+        id: newClassData.id,
+        name: newClassData.name,
+        subject: newClassData.subject,
+        description: newClassData.description,
+        class_code: newClassData.class_code,
         student_count: 0,
       };
       
-      setClasses(prev => [...prev, mockClass]);
+      setClasses(prev => [...prev, newClassItem]);
       setShowCreateDialog(false);
       setNewClass({ name: "", subject: "", description: "" });
       
       toast({
         title: "Success!",
-        description: "Class created successfully.",
+        description: `Class created with code: ${classCode}`,
       });
-      
-      // Navigate to upload materials for this class
-      navigate("/dashboard");
     } catch (error) {
       console.error("Error creating class:", error);
       toast({
@@ -118,6 +172,14 @@ const TeacherDashboard = () => {
     } finally {
       setCreateLoading(false);
     }
+  };
+
+  const copyClassCode = (classCode: string) => {
+    navigator.clipboard.writeText(classCode);
+    toast({
+      title: "Copied!",
+      description: "Class code copied to clipboard.",
+    });
   };
 
   if (loading) {
@@ -229,9 +291,25 @@ const TeacherDashboard = () => {
                     {classItem.description && (
                       <p className="text-sm text-muted-foreground mb-4">{classItem.description}</p>
                     )}
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                       <Users className="w-4 h-4" />
                       <span>{classItem.student_count} students</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-muted p-2 rounded mb-4">
+                      <div>
+                        <span className="text-xs text-muted-foreground">Class Code:</span>
+                        <div className="font-mono font-semibold text-sm">{classItem.class_code}</div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyClassCode(classItem.class_code);
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
                     </div>
                     <Button 
                       variant="outline" 
