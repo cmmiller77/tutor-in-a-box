@@ -48,7 +48,7 @@ const StudentDashboard = () => {
         return;
       }
       
-      if (profile.role !== "student") {
+      if (profile.role !== "student" && profile.role !== "admin") {
         navigate("/teacher-dashboard");
         return;
       }
