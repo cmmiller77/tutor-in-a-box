@@ -75,11 +75,7 @@ const StudentDashboard = () => {
             name,
             subject,
             description,
-            teacher_id,
-            profiles!classes_teacher_id_fkey (
-              first_name,
-              last_name
-            )
+            teacher_id
           )
         `)
         .eq('student_id', session.user.id);
@@ -94,10 +90,17 @@ const StudentDashboard = () => {
         return;
       }
 
+      // Fetch teacher profiles separately
+      const teacherIds = enrollmentData?.map((enrollment: any) => enrollment.classes.teacher_id) || [];
+      const { data: teacherProfiles } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .in('user_id', teacherIds);
+
       // Transform data for display
       const transformedClasses = enrollmentData?.map((enrollment: any) => {
         const classData = enrollment.classes;
-        const teacher = classData.profiles;
+        const teacher = teacherProfiles?.find(t => t.user_id === classData.teacher_id);
         return {
           id: classData.id,
           name: classData.name,
