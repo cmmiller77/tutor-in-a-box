@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import QuestionAnalytics from "@/components/QuestionAnalytics";
+import UploadSection from "@/components/UploadSection";
 
 interface ClassItem {
   id: string;
@@ -250,9 +251,6 @@ const ClassDashboard = () => {
                   <CardContent>
                     <p className="text-3xl font-bold">0</p>
                     <p className="text-sm text-muted-foreground">Course materials</p>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate("/dashboard")}>
-                      Manage Materials
-                    </Button>
                   </CardContent>
                 </Card>
 
@@ -284,24 +282,7 @@ const ClassDashboard = () => {
             </TabsContent>
 
             <TabsContent value="materials" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Course Materials</CardTitle>
-                  <CardDescription>Manage PDFs and learning resources for this class</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No materials yet</h3>
-                    <p className="text-muted-foreground mb-6">
-                      Upload course materials to train AI tutors for this specific class
-                    </p>
-                    <Button onClick={() => navigate("/dashboard")}>
-                      Upload Materials
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <UploadSection classId={classData.id} />
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">

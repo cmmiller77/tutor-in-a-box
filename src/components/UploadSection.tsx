@@ -6,7 +6,11 @@ import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import uploadIcon from "@/assets/upload-icon.jpg"
 
-const UploadSection = () => {
+interface UploadSectionProps {
+  classId?: string;
+}
+
+const UploadSection = ({ classId }: UploadSectionProps) => {
   const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [processing, setProcessing] = useState(false)
