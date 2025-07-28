@@ -265,14 +265,10 @@ const TeacherDashboard = () => {
           </div>
 
           <Tabs defaultValue="classes" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="classes" className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" />
                 Classes
-              </TabsTrigger>
-              <TabsTrigger value="analytics" className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Question Analytics
               </TabsTrigger>
             </TabsList>
 
@@ -292,9 +288,9 @@ const TeacherDashboard = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
                   {classes.map((classItem) => (
-                    <Card key={classItem.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                    <Card key={classItem.id} className="hover:shadow-lg transition-shadow">
                       <CardHeader>
                         <CardTitle className="flex items-center justify-between">
                           <span>{classItem.name}</span>
@@ -326,13 +322,38 @@ const TeacherDashboard = () => {
                             <Copy className="w-4 h-4" />
                           </Button>
                         </div>
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => navigate("/dashboard")}
-                        >
-                          Manage Materials
-                        </Button>
+                        
+                        <Tabs defaultValue="overview" className="w-full">
+                          <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="overview">Overview</TabsTrigger>
+                            <TabsTrigger value="materials">Materials</TabsTrigger>
+                            <TabsTrigger value="analytics" className="flex items-center gap-1">
+                              <BarChart3 className="w-3 h-3" />
+                              Analytics
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="overview" className="mt-4">
+                            <div className="text-center py-4">
+                              <p className="text-sm text-muted-foreground mb-2">Class Overview</p>
+                              <p className="text-lg font-semibold">{classItem.student_count} students enrolled</p>
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="materials" className="mt-4">
+                            <Button 
+                              variant="outline" 
+                              className="w-full"
+                              onClick={() => navigate("/dashboard")}
+                            >
+                              Manage Materials
+                            </Button>
+                          </TabsContent>
+                          <TabsContent value="analytics" className="mt-4">
+                            <QuestionAnalytics 
+                              classId={classItem.id} 
+                              className={classItem.name}
+                            />
+                          </TabsContent>
+                        </Tabs>
                       </CardContent>
                     </Card>
                   ))}
@@ -340,9 +361,6 @@ const TeacherDashboard = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="analytics" className="space-y-6">
-              <QuestionAnalytics />
-            </TabsContent>
           </Tabs>
         </div>
       </div>

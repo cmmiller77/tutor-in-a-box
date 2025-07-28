@@ -37,7 +37,12 @@ interface TopQuestion {
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
-const QuestionAnalytics = () => {
+interface QuestionAnalyticsProps {
+  classId?: string;
+  className?: string;
+}
+
+const QuestionAnalytics = ({ classId, className }: QuestionAnalyticsProps) => {
   const [questionData, setQuestionData] = useState<QuestionData[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [subjectStats, setSubjectStats] = useState<SubjectStats[]>([]);
@@ -50,15 +55,14 @@ const QuestionAnalytics = () => {
 
   useEffect(() => {
     fetchAnalyticsData();
-  }, []);
+  }, [classId]);
 
   const fetchAnalyticsData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Get all questions for teacher's students through enrollments
-      const { data: questions, error } = await supabase
+      let query = supabase
         .from('question_analytics')
         .select(`
           *,
@@ -69,8 +73,14 @@ const QuestionAnalytics = () => {
             )
           )
         `)
-        .eq('enrollments.classes.teacher_id', session.user.id)
-        .order('created_at', { ascending: false });
+        .eq('enrollments.classes.teacher_id', session.user.id);
+      
+      // Filter by specific class if classId is provided
+      if (classId) {
+        query = query.eq('class_id', classId);
+      }
+      
+      const { data: questions, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         console.error("Error fetching analytics:", error);
@@ -205,6 +215,12 @@ const QuestionAnalytics = () => {
 
   return (
     <div className="space-y-6">
+      {className && (
+        <div className="mb-4">
+          <h3 className="text-xl font-semibold">{className} Analytics</h3>
+          <p className="text-muted-foreground">Question analytics for this class</p>
+        </div>
+      )}
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
