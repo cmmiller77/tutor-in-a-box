@@ -15,8 +15,21 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body
-    const { filePath, filename } = await req.json();
+    // Parse request body safely
+    let filePath, filename;
+    try {
+      const body = await req.json();
+      filePath = body.filePath;
+      filename = body.filename;
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      throw new Error('Invalid request body - must be valid JSON');
+    }
+    
+    if (!filePath || !filename) {
+      throw new Error('Missing required fields: filePath and filename');
+    }
+    
     console.log('Processing file:', filePath, filename);
     
     // Check environment
