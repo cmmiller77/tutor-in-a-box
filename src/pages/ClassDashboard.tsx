@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import QuestionAnalytics from "@/components/QuestionAnalytics";
 import UploadSection from "@/components/UploadSection";
+import DocumentManager from "@/components/DocumentManager";
 
 interface ClassItem {
   id: string;
@@ -282,7 +283,26 @@ const ClassDashboard = () => {
             </TabsContent>
 
             <TabsContent value="materials" className="space-y-6">
-              <UploadSection classId={classData.id} />
+              <Tabs defaultValue="upload" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="upload" className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4" />
+                    Upload Materials
+                  </TabsTrigger>
+                  <TabsTrigger value="documents" className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4" />
+                    Manage Documents
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="upload">
+                  <UploadSection classId={classData.id} />
+                </TabsContent>
+                
+                <TabsContent value="documents">
+                  <DocumentManager classId={classData.id} />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">
