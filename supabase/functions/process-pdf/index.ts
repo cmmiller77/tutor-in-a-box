@@ -15,15 +15,29 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body safely
+    // Handle request body from supabase.functions.invoke
     let filePath, filename;
-    try {
+    
+    const contentType = req.headers.get('content-type');
+    console.log('Content-Type:', contentType);
+    console.log('Request method:', req.method);
+    
+    if (contentType?.includes('application/json')) {
       const body = await req.json();
       filePath = body.filePath;
       filename = body.filename;
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      throw new Error('Invalid request body - must be valid JSON');
+    } else {
+      // Handle text/plain or other formats
+      const bodyText = await req.text();
+      console.log('Raw body text:', bodyText);
+      try {
+        const parsed = JSON.parse(bodyText);
+        filePath = parsed.filePath;
+        filename = parsed.filename;
+      } catch (e) {
+        console.error('Failed to parse body as JSON:', e);
+        throw new Error('Invalid request body format');
+      }
     }
     
     if (!filePath || !filename) {
