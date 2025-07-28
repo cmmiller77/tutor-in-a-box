@@ -187,6 +187,47 @@ export type Database = {
         }
         Relationships: []
       }
+      question_analytics: {
+        Row: {
+          class_id: string | null
+          created_at: string
+          id: string
+          question: string
+          response_generated: boolean | null
+          sources_found: number | null
+          subject: string | null
+          user_id: string
+        }
+        Insert: {
+          class_id?: string | null
+          created_at?: string
+          id?: string
+          question: string
+          response_generated?: boolean | null
+          sources_found?: number | null
+          subject?: string | null
+          user_id: string
+        }
+        Update: {
+          class_id?: string | null
+          created_at?: string
+          id?: string
+          question?: string
+          response_generated?: boolean | null
+          sources_found?: number | null
+          subject?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_analytics_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "User Tables": {
         Row: {
           created_at: string
