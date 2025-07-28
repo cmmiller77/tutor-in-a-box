@@ -84,6 +84,10 @@ serve(async (req) => {
 
     console.log('Processing query:', query);
 
+    // Log question for analytics
+    let sourcesFound = 0;
+    let responseGenerated = false;
+
     // Step 1: Convert user query to embedding for similarity search
     console.log('Converting query to embedding...');
     
@@ -215,6 +219,15 @@ serve(async (req) => {
 
     if (!similarChunks || similarChunks.length === 0) {
       console.log('No relevant chunks found for query');
+      
+      // Log analytics for no results found
+      await supabase.from('question_analytics').insert({
+        user_id: user.id,
+        question: query,
+        sources_found: 0,
+        response_generated: false
+      });
+
       return new Response(
         JSON.stringify({ 
           answer: 'I could not find relevant information in your uploaded materials to answer this question. Please make sure you have uploaded course materials related to your question.',
@@ -228,6 +241,7 @@ serve(async (req) => {
     }
 
     console.log(`Found ${similarChunks.length} relevant chunks with similarity scores`);
+    sourcesFound = similarChunks.length;
 
     // Step 3: Create rich context from the most relevant chunks
     const context = similarChunks
@@ -312,6 +326,7 @@ Please provide a detailed answer based on the course materials above, and refere
 
     const chatData = await chatResponse.json();
     const answer = chatData.choices[0].message.content;
+    responseGenerated = true;
 
     console.log('Generated comprehensive AI answer based on course materials');
 
@@ -331,6 +346,14 @@ Please provide a detailed answer based on the course materials above, and refere
     };
 
     console.log('Returning successful response');
+
+    // Log successful analytics
+    await supabase.from('question_analytics').insert({
+      user_id: user.id,
+      question: query,
+      sources_found: sourcesFound,
+      response_generated: responseGenerated
+    });
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

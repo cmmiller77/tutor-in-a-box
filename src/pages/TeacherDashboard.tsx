@@ -5,10 +5,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, BookOpen, Users, Copy } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, BookOpen, Users, Copy, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
+import QuestionAnalytics from "@/components/QuestionAnalytics";
 
 interface ClassItem {
   id: string;
@@ -262,67 +264,86 @@ const TeacherDashboard = () => {
             </Dialog>
           </div>
 
-          {classes.length === 0 ? (
-            <Card className="text-center py-12">
-              <CardContent>
-                <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No classes yet</h3>
-                <p className="text-muted-foreground mb-6">
-                  Create your first class to start uploading course materials and training AI tutors
-                </p>
-                <Button variant="hero" onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Your First Class
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {classes.map((classItem) => (
-                <Card key={classItem.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>{classItem.name}</span>
-                      <BookOpen className="w-5 h-5 text-primary" />
-                    </CardTitle>
-                    <CardDescription>{classItem.subject}</CardDescription>
-                  </CardHeader>
+          <Tabs defaultValue="classes" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="classes" className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                Classes
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Question Analytics
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="classes" className="space-y-6">
+              {classes.length === 0 ? (
+                <Card className="text-center py-12">
                   <CardContent>
-                    {classItem.description && (
-                      <p className="text-sm text-muted-foreground mb-4">{classItem.description}</p>
-                    )}
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <Users className="w-4 h-4" />
-                      <span>{classItem.student_count} students</span>
-                    </div>
-                    <div className="flex items-center justify-between bg-muted p-2 rounded mb-4">
-                      <div>
-                        <span className="text-xs text-muted-foreground">Class Code:</span>
-                        <div className="font-mono font-semibold text-sm">{classItem.class_code}</div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyClassCode(classItem.class_code);
-                        }}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => navigate("/dashboard")}
-                    >
-                      Manage Materials
+                    <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">No classes yet</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Create your first class to start uploading course materials and training AI tutors
+                    </p>
+                    <Button variant="hero" onClick={() => setShowCreateDialog(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Class
                     </Button>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {classes.map((classItem) => (
+                    <Card key={classItem.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <span>{classItem.name}</span>
+                          <BookOpen className="w-5 h-5 text-primary" />
+                        </CardTitle>
+                        <CardDescription>{classItem.subject}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {classItem.description && (
+                          <p className="text-sm text-muted-foreground mb-4">{classItem.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                          <Users className="w-4 h-4" />
+                          <span>{classItem.student_count} students</span>
+                        </div>
+                        <div className="flex items-center justify-between bg-muted p-2 rounded mb-4">
+                          <div>
+                            <span className="text-xs text-muted-foreground">Class Code:</span>
+                            <div className="font-mono font-semibold text-sm">{classItem.class_code}</div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyClassCode(classItem.class_code);
+                            }}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => navigate("/dashboard")}
+                        >
+                          Manage Materials
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-6">
+              <QuestionAnalytics />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
