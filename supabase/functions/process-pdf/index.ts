@@ -15,30 +15,13 @@ serve(async (req) => {
   }
 
   try {
-    // Handle request body from supabase.functions.invoke
-    let filePath, filename;
-    
-    const contentType = req.headers.get('content-type');
-    console.log('Content-Type:', contentType);
+    console.log('=== Processing PDF Request ===');
+    console.log('Content-Type:', req.headers.get('content-type'));
     console.log('Request method:', req.method);
     
-    if (contentType?.includes('application/json')) {
-      const body = await req.json();
-      filePath = body.filePath;
-      filename = body.filename;
-    } else {
-      // Handle text/plain or other formats
-      const bodyText = await req.text();
-      console.log('Raw body text:', bodyText);
-      try {
-        const parsed = JSON.parse(bodyText);
-        filePath = parsed.filePath;
-        filename = parsed.filename;
-      } catch (e) {
-        console.error('Failed to parse body as JSON:', e);
-        throw new Error('Invalid request body format');
-      }
-    }
+    // Parse request body - Supabase functions.invoke automatically handles JSON
+    const { filePath, filename } = await req.json();
+    console.log('Parsed body:', { filePath, filename });
     
     if (!filePath || !filename) {
       throw new Error('Missing required fields: filePath and filename');

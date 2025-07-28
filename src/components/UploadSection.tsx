@@ -115,7 +115,6 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
         },
       })
 
