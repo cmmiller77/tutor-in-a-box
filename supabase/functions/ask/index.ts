@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('=== ASK FUNCTION START ===');
+  console.log('=== ASK FUNCTION START (with class tracking) ===');
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
