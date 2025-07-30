@@ -11,6 +11,7 @@ import SignIn from "./pages/SignIn";
 import RoleSelection from "./pages/RoleSelection";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import ClassDashboard from "./pages/ClassDashboard";
+import ClassAITutor from "./pages/ClassAITutor";
 import StudentDashboard from "./pages/StudentDashboard";
 import AITutorDashboard from "./pages/AITutorDashboard";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/role-selection" element={<RoleSelection />} />
           <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
           <Route path="/class/:classId" element={<ClassDashboard />} />
+          <Route path="/class/:classId/ai-tutor" element={<ClassAITutor />} />
           <Route path="/student-dashboard" element={<StudentDashboard />} />
           <Route path="/ai-tutor" element={<AITutorDashboard />} />
           <Route path="*" element={<NotFound />} />
