@@ -308,6 +308,16 @@ export type Database = {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: unknown
       }
+      log_question_with_class: {
+        Args: {
+          p_user_id: string
+          p_question: string
+          p_class_id?: string
+          p_sources_found?: number
+          p_response_generated?: boolean
+        }
+        Returns: string
+      }
       match_chunks: {
         Args: {
           query_embedding: string

@@ -237,15 +237,19 @@ serve(async (req) => {
     if (!similarChunks || similarChunks.length === 0) {
       console.log('No relevant chunks found for query');
       
-      // Log analytics for no results found
-      await supabase.from('question_analytics').insert({
-        user_id: user.id,
-        question: query,
-        sources_found: 0,
-        response_generated: false,
-        class_id: classId,
-        subject: classSubject
-      });
+      // Log analytics for no results found using the new database function
+      const { error: logError } = await supabase
+        .rpc('log_question_with_class', {
+          p_user_id: user.id,
+          p_question: query,
+          p_class_id: classId,
+          p_sources_found: 0,
+          p_response_generated: false
+        });
+
+      if (logError) {
+        console.log('Warning: Failed to log question analytics:', logError);
+      }
 
       return new Response(
         JSON.stringify({ 
@@ -366,15 +370,19 @@ Please provide a detailed answer based on the course materials above, and refere
 
     console.log('Returning successful response');
 
-    // Log successful analytics
-    await supabase.from('question_analytics').insert({
-      user_id: user.id,
-      question: query,
-      sources_found: sourcesFound,
-      response_generated: responseGenerated,
-      class_id: classId,
-      subject: classSubject
-    });
+    // Log successful analytics using the new database function
+    const { error: logError } = await supabase
+      .rpc('log_question_with_class', {
+        p_user_id: user.id,
+        p_question: query,
+        p_class_id: classId,
+        p_sources_found: sourcesFound,
+        p_response_generated: responseGenerated
+      });
+
+    if (logError) {
+      console.log('Warning: Failed to log question analytics:', logError);
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
