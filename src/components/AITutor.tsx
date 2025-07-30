@@ -19,7 +19,11 @@ interface QAResult {
   query: string
 }
 
-const AITutor = () => {
+interface AITutorProps {
+  classId?: string
+}
+
+const AITutor = ({ classId }: AITutorProps) => {
   const [question, setQuestion] = useState("")
   const [loading, setLoading] = useState(false)
   const [conversation, setConversation] = useState<QAResult[]>([])
@@ -45,7 +49,10 @@ const AITutor = () => {
       }
 
       const response = await supabase.functions.invoke('ask', {
-        body: { query: question }
+        body: { 
+          query: question,
+          class_id: classId 
+        }
       })
 
       if (response.error) {

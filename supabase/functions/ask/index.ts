@@ -56,12 +56,13 @@ serve(async (req) => {
 
     // Parse request body (using the working pattern)
     const rawBody = await req.text();
-    let query;
+    let query, classId;
     
     if (rawBody) {
       try {
         const parsed = JSON.parse(rawBody);
         query = parsed.query;
+        classId = parsed.class_id;
       } catch (e) {
         return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
           status: 400,
@@ -83,6 +84,22 @@ serve(async (req) => {
     }
 
     console.log('Processing query:', query);
+    console.log('Class ID:', classId);
+
+    // Get class details if classId is provided
+    let classSubject = null;
+    if (classId) {
+      const { data: classData } = await supabase
+        .from('classes')
+        .select('subject')
+        .eq('id', classId)
+        .single();
+      
+      if (classData) {
+        classSubject = classData.subject;
+        console.log('Found class subject:', classSubject);
+      }
+    }
 
     // Log question for analytics
     let sourcesFound = 0;
@@ -225,7 +242,9 @@ serve(async (req) => {
         user_id: user.id,
         question: query,
         sources_found: 0,
-        response_generated: false
+        response_generated: false,
+        class_id: classId,
+        subject: classSubject
       });
 
       return new Response(
@@ -352,7 +371,9 @@ Please provide a detailed answer based on the course materials above, and refere
       user_id: user.id,
       question: query,
       sources_found: sourcesFound,
-      response_generated: responseGenerated
+      response_generated: responseGenerated,
+      class_id: classId,
+      subject: classSubject
     });
 
     return new Response(JSON.stringify(result), {

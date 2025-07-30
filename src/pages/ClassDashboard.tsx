@@ -10,6 +10,7 @@ import Header from "@/components/Header";
 import QuestionAnalytics from "@/components/QuestionAnalytics";
 import UploadSection from "@/components/UploadSection";
 import DocumentManager from "@/components/DocumentManager";
+import AITutor from "@/components/AITutor";
 
 interface ClassItem {
   id: string;
@@ -284,7 +285,7 @@ const ClassDashboard = () => {
 
             <TabsContent value="materials" className="space-y-6">
               <Tabs defaultValue="upload" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="upload" className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4" />
                     Upload Materials
@@ -292,6 +293,10 @@ const ClassDashboard = () => {
                   <TabsTrigger value="documents" className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4" />
                     Manage Documents
+                  </TabsTrigger>
+                  <TabsTrigger value="tutor" className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4" />
+                    AI Tutor
                   </TabsTrigger>
                 </TabsList>
                 
@@ -301,6 +306,10 @@ const ClassDashboard = () => {
                 
                 <TabsContent value="documents">
                   <DocumentManager classId={classData.id} />
+                </TabsContent>
+                
+                <TabsContent value="tutor">
+                  <AITutor classId={classData.id} />
                 </TabsContent>
               </Tabs>
             </TabsContent>
