@@ -266,12 +266,6 @@ const ClassDashboard = () => {
                   <CardContent>
                     <p className="text-3xl font-bold">0</p>
                     <p className="text-sm text-muted-foreground">Questions asked today</p>
-                    <Button 
-                      className="mt-4 w-full" 
-                      onClick={() => navigate(`/class/${classData.id}/ai-tutor`)}
-                    >
-                      Open AI Tutor
-                    </Button>
                   </CardContent>
                 </Card>
               </div>

@@ -298,7 +298,7 @@ const StudentDashboard = () => {
                     <Button 
                       variant="hero" 
                       className="w-full flex items-center gap-2"
-                      onClick={() => navigate("/ai-tutor")}
+                      onClick={() => navigate(`/class/${classItem.id}/ai-tutor`)}
                     >
                       <Brain className="w-4 h-4" />
                       Ask AI Tutor
