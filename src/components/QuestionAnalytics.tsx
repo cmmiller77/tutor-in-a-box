@@ -64,20 +64,34 @@ const QuestionAnalytics = ({ classId, className }: QuestionAnalyticsProps) => {
 
       let query = supabase
         .from('question_analytics')
-        .select(`
-          *,
-          enrollments!inner(
-            student_id,
-            classes!inner(
-              teacher_id
-            )
-          )
-        `)
-        .eq('enrollments.classes.teacher_id', session.user.id);
+        .select('*');
       
       // Filter by specific class if classId is provided
       if (classId) {
         query = query.eq('class_id', classId);
+      } else {
+        // For teachers viewing all classes, we need to check if they own the classes
+        // First get the teacher's classes
+        const { data: teacherClasses } = await supabase
+          .from('classes')
+          .select('id')
+          .eq('teacher_id', session.user.id);
+        
+        if (teacherClasses && teacherClasses.length > 0) {
+          const classIds = teacherClasses.map(c => c.id);
+          query = query.in('class_id', classIds);
+        } else {
+          // No classes found, return empty data
+          setQuestionData([]);
+          setTotalQuestions(0);
+          setSuccessRate(0);
+          setActiveStudents(0);
+          setDailyStats([]);
+          setSubjectStats([]);
+          setTopQuestions([]);
+          setLoading(false);
+          return;
+        }
       }
       
       const { data: questions, error } = await query.order('created_at', { ascending: false });
