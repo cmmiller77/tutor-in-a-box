@@ -305,7 +305,7 @@ Please provide a detailed answer based on the course materials above, and refere
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5',
         messages: [
           {
             role: 'system',
