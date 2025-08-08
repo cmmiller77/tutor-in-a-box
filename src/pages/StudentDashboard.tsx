@@ -16,6 +16,7 @@ interface ClassItem {
   subject: string;
   teacher: string;
   description?: string;
+  ai_enabled: boolean;
 }
 
 const StudentDashboard = () => {
@@ -75,7 +76,8 @@ const StudentDashboard = () => {
             name,
             subject,
             description,
-            teacher_id
+            teacher_id,
+            ai_enabled
           )
         `)
         .eq('student_id', session.user.id);
@@ -107,6 +109,7 @@ const StudentDashboard = () => {
           subject: classData.subject,
           description: classData.description,
           teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown Teacher",
+          ai_enabled: classData.ai_enabled,
         };
       }) || [];
 
@@ -296,12 +299,13 @@ const StudentDashboard = () => {
                       <p className="text-sm text-muted-foreground mb-4">{classItem.description}</p>
                     )}
                     <Button 
-                      variant="hero" 
+                      variant={classItem.ai_enabled ? "hero" : "outline"} 
                       className="w-full flex items-center gap-2"
-                      onClick={() => navigate(`/class/${classItem.id}/ai-tutor`)}
+                      onClick={classItem.ai_enabled ? () => navigate(`/class/${classItem.id}/ai-tutor`) : undefined}
+                      disabled={!classItem.ai_enabled}
                     >
                       <Brain className="w-4 h-4" />
-                      Ask AI Tutor
+                      {classItem.ai_enabled ? "Ask AI Tutor" : "Unavailable"}
                     </Button>
                   </CardContent>
                 </Card>

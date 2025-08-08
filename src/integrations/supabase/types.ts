@@ -52,6 +52,7 @@ export type Database = {
       }
       classes: {
         Row: {
+          ai_enabled: boolean
           class_code: string
           created_at: string
           description: string | null
@@ -62,6 +63,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_enabled?: boolean
           class_code: string
           created_at?: string
           description?: string | null
@@ -72,6 +74,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_enabled?: boolean
           class_code?: string
           created_at?: string
           description?: string | null

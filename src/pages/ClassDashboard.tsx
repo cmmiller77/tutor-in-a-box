@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, BookOpen, Users, Copy, BarChart3, Settings } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, BookOpen, Users, Copy, BarChart3, Settings, Brain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -19,6 +20,7 @@ interface ClassItem {
   description?: string;
   student_count: number;
   class_code: string;
+  ai_enabled: boolean;
 }
 
 const ClassDashboard = () => {
@@ -73,6 +75,7 @@ const ClassDashboard = () => {
           subject,
           description,
           class_code,
+          ai_enabled,
           enrollments(count)
         `)
         .eq('id', classId)
@@ -107,6 +110,7 @@ const ClassDashboard = () => {
         subject: classInfo.subject,
         description: classInfo.description,
         class_code: classInfo.class_code,
+        ai_enabled: classInfo.ai_enabled,
         student_count: classInfo.enrollments?.length || 0,
       };
 
@@ -130,6 +134,33 @@ const ClassDashboard = () => {
       title: "Copied!",
       description: "Class code copied to clipboard.",
     });
+  };
+
+  const toggleAIAccess = async (enabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .update({ ai_enabled: enabled })
+        .eq('id', classData?.id);
+
+      if (error) throw error;
+
+      setClassData(prev => prev ? { ...prev, ai_enabled: enabled } : null);
+      
+      toast({
+        title: enabled ? "AI Enabled" : "AI Disabled",
+        description: enabled 
+          ? "Students can now access the AI tutor for this class."
+          : "Students can no longer access the AI tutor for this class.",
+      });
+    } catch (error) {
+      console.error("Error updating AI access:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update AI access setting.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -256,19 +287,50 @@ const ClassDashboard = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5" />
-                      Activity
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">0</p>
-                    <p className="text-sm text-muted-foreground">Questions asked today</p>
-                  </CardContent>
-                </Card>
-              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5" />
+                    Activity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">0</p>
+                  <p className="text-sm text-muted-foreground">Questions asked today</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="w-5 h-5" />
+                  AI Tutor Access
+                </CardTitle>
+                <CardDescription>
+                  Control whether students can access the AI tutor for this class
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      AI Tutor is {classData.ai_enabled ? "Enabled" : "Disabled"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {classData.ai_enabled 
+                        ? "Students can ask questions and get AI assistance"
+                        : "Students cannot access the AI tutor (useful during tests)"
+                      }
+                    </p>
+                  </div>
+                  <Switch
+                    checked={classData.ai_enabled}
+                    onCheckedChange={toggleAIAccess}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
               <Card>
                 <CardHeader>
