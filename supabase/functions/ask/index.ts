@@ -269,7 +269,7 @@ serve(async (req) => {
     // Step 3: Create rich context from the most relevant chunks
     const context = similarChunks
       .map((chunk: any, index: number) => 
-        `[Source ${index + 1}] ${chunk.source_file} (Page ${chunk.page_number}) - Similarity: ${(chunk.similarity * 100).toFixed(1)}%\n${chunk.text}`
+        `[Source ${index + 1}] ${chunk.source_file} (Page ${chunk.page_number})\n${chunk.text}`
       )
       .join('\n\n---\n\n');
 
