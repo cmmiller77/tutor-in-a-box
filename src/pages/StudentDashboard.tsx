@@ -226,7 +226,7 @@ const StudentDashboard = () => {
                 Student Dashboard
               </h1>
               <p className="text-xl text-muted-foreground">
-                {userSchool && `${userSchool} • `}Access your classes and AI tutors
+                Access your classes and AI tutors
               </p>
             </div>
             
