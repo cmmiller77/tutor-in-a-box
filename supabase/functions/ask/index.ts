@@ -316,7 +316,6 @@ Please provide a detailed answer based on the course materials above, and refere
             content: userPrompt
           }
         ],
-        temperature: 0.3, // Lower temperature for more focused, educational responses
         max_completion_tokens: 1500, // More tokens for comprehensive answers
       }),
     });
