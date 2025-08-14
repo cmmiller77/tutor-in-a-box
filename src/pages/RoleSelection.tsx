@@ -83,7 +83,7 @@ const RoleSelection = () => {
           <div className="text-center mb-8">
             <Brain className="w-16 h-16 text-primary mx-auto mb-4" />
             <h1 className="text-4xl font-bold heading-gradient mb-4">
-              Welcome to myTutor!
+              Welcome to Grad.ai!
             </h1>
             <p className="text-xl text-muted-foreground">
               Let's get you set up. Are you a teacher or a student?

@@ -32,7 +32,7 @@ const Header = () => {
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2">
             <Brain className="w-8 h-8 text-primary" />
-            <span className="text-2xl font-bold heading-gradient">myTutor</span>
+            <span className="text-2xl font-bold heading-gradient">Grad.ai</span>
           </Link>
         </div>
         

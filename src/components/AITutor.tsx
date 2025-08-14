@@ -92,10 +92,10 @@ const AITutor = ({ classId }: AITutorProps) => {
       <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-2 mb-4">
           <MessageSquare className="w-8 h-8 text-primary" />
-          <h2 className="text-3xl font-bold heading-gradient">AI Tutor</h2>
+          <h2 className="text-3xl font-bold heading-gradient">Experience AI Tutoring</h2>
         </div>
         <p className="text-lg text-muted-foreground">
-          Ask questions about your uploaded course materials and get AI-powered answers
+          See how students interact with AI tutors and the insights you'll gain as an educator
         </p>
       </div>
 
@@ -104,7 +104,7 @@ const AITutor = ({ classId }: AITutorProps) => {
         <div className="space-y-4">
           <div className="flex gap-4">
             <Input
-              placeholder="Ask a question about your course material..."
+              placeholder="Try: 'Explain quantum superposition in simple terms'"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -124,7 +124,7 @@ const AITutor = ({ classId }: AITutorProps) => {
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Press Enter to send or Shift+Enter for new line
+            This is how students will interact with their AI tutor. All questions are tracked for your analytics.
           </p>
         </div>
       </Card>
@@ -135,7 +135,7 @@ const AITutor = ({ classId }: AITutorProps) => {
           <Card className="p-8 text-center">
             <div className="text-muted-foreground">
               <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No questions asked yet. Upload a PDF and start asking questions!</p>
+              <p>Try asking a sample question to see how the AI tutor responds and generates insights!</p>
             </div>
           </Card>
         ) : (

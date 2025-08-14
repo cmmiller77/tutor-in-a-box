@@ -1,7 +1,7 @@
 import Header from "@/components/Header"
 import Hero from "@/components/Hero"
-import UploadSection from "@/components/UploadSection"
-import LessonPlan from "@/components/LessonPlan"
+import TeacherFeatures from "@/components/TeacherFeatures"
+import DataInsights from "@/components/DataInsights"
 import AITutor from "@/components/AITutor"
 
 const Index = () => {
@@ -9,8 +9,8 @@ const Index = () => {
     <div className="min-h-screen">
       <Header />
       <Hero />
-      <UploadSection />
-      <LessonPlan />
+      <TeacherFeatures />
+      <DataInsights />
       <AITutor />
     </div>
   )

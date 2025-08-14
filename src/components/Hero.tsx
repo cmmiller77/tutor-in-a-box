@@ -11,45 +11,45 @@ const Hero = () => {
           <div className="animate-fade-in">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
               <Brain className="w-4 h-4" />
-              Your Personal AI Tutor
+              AI-Powered Education Platform
             </div>
             
             <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 text-shadow">
-              Your Personal
+              Transform Your
               <span className="heading-gradient block">
-                AI Tutor
+                Classroom
               </span>
-              Adapts to You
+              with AI Tutors
             </h1>
             
             <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-              Upload your course materials and myTutor instantly adapts to your learning style. 
-              Get personalized explanations, interactive Q&A, and study plans tailored just for you. 
-              Your AI tutor learns how you learn best, making every lesson perfectly personalized.
+              Deploy AI tutors for your classes and gain valuable insights into student learning. 
+              Track question patterns, identify knowledge gaps, and improve outcomes with real-time data. 
+              Empower your teaching with intelligent analytics that help every student succeed.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
               <Button variant="hero" size="lg" className="group">
-                Start Learning Now
+                Start Teaching with AI
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button variant="outline" size="lg">
-                Watch Demo
+                See Teacher Dashboard
               </Button>
             </div>
 
             <div className="grid grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">10M+</div>
-                <div className="text-sm text-muted-foreground">Materials Processed</div>
+                <div className="text-2xl font-bold text-primary">500+</div>
+                <div className="text-sm text-muted-foreground">Active Classrooms</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-accent">99%</div>
-                <div className="text-sm text-muted-foreground">Accuracy Rate</div>
+                <div className="text-2xl font-bold text-accent">85%</div>
+                <div className="text-sm text-muted-foreground">Improved Outcomes</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-educational">24/7</div>
-                <div className="text-sm text-muted-foreground">AI Tutoring</div>
+                <div className="text-2xl font-bold text-educational">Real-time</div>
+                <div className="text-sm text-muted-foreground">Learning Analytics</div>
               </div>
             </div>
           </div>
@@ -83,11 +83,11 @@ const Hero = () => {
                 
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
                   <div className="text-white text-sm">
-                    "Explain quantum mechanics concepts from uploaded PDF..."
+                    "What concepts are students struggling with most?"
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                    <span className="text-white/80 text-xs">AI tutor responding...</span>
+                    <span className="text-white/80 text-xs">Analyzing student questions...</span>
                   </div>
                 </div>
               </div>

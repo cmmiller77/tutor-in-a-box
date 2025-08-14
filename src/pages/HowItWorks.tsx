@@ -7,7 +7,7 @@ const HowItWorks = () => {
     {
       step: "01",
       title: "Upload Your Materials",
-      description: "Simply drag and drop your course documents, PDFs, notes, or any study material. myTutor supports all major file formats.",
+      description: "Simply drag and drop your course documents, PDFs, notes, or any study material. Grad.ai supports all major file formats.",
       icon: Upload,
       color: "text-primary"
     },
@@ -51,7 +51,7 @@ const HowItWorks = () => {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Brain className="w-8 h-8 text-primary" />
-              <span className="text-2xl font-bold heading-gradient">myTutor</span>
+              <span className="text-2xl font-bold heading-gradient">Grad.ai</span>
             </div>
           </div>
           
@@ -81,7 +81,7 @@ const HowItWorks = () => {
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6">
-            How <span className="heading-gradient">myTutor</span> Works
+            How <span className="heading-gradient">Grad.ai</span> Works
           </h1>
           
           <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
@@ -152,7 +152,7 @@ const HowItWorks = () => {
             Ready to Get Started?
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of students who are already learning faster and more effectively with myTutor.
+            Join thousands of educators who are already improving learning outcomes with Grad.ai.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

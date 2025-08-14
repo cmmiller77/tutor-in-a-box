@@ -8,7 +8,7 @@ const Pricing = () => {
     {
       name: "Starter",
       price: "Free",
-      description: "Perfect for trying out myTutor",
+      description: "Perfect for trying out Grad.ai",
       icon: Brain,
       color: "text-muted-foreground",
       bgColor: "bg-card",
@@ -97,7 +97,7 @@ const Pricing = () => {
     },
     {
       question: "What file formats are supported?",
-      answer: "myTutor supports PDF, DOCX, TXT, PPTX, and many other common document formats. Our AI can extract text and understand content from most educational materials."
+      answer: "Grad.ai supports PDF, DOCX, TXT, PPTX, and many other common document formats. Our AI can extract text and understand content from most educational materials."
     },
     {
       question: "Can I cancel my subscription anytime?",
@@ -117,7 +117,7 @@ const Pricing = () => {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Brain className="w-8 h-8 text-primary" />
-              <span className="text-2xl font-bold heading-gradient">myTutor</span>
+              <span className="text-2xl font-bold heading-gradient">Grad.ai</span>
             </div>
           </div>
           
@@ -239,7 +239,7 @@ const Pricing = () => {
             Ready to Start Learning?
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of students who are already learning faster and more effectively with myTutor.
+            Join thousands of educators who are already improving learning outcomes with Grad.ai.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

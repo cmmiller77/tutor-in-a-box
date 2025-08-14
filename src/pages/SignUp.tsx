@@ -109,14 +109,14 @@ const SignUp = () => {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
           <Brain className="w-8 h-8 text-primary" />
-          <span className="text-2xl font-bold heading-gradient">myTutor</span>
+          <span className="text-2xl font-bold heading-gradient">Grad.ai</span>
         </div>
 
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Create Your Account</CardTitle>
             <CardDescription>
-              Join myTutor and start your personalized learning journey
+              Join Grad.ai and start transforming your classroom
             </CardDescription>
           </CardHeader>
           <CardContent>
