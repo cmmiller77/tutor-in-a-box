@@ -91,30 +91,67 @@ ${context}
 
 Generate exactly ${count} flashcards in JSON format:`;
 
-    const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert educator creating study flashcards. Generate flashcards that effectively test student understanding. Always respond with valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_completion_tokens: 2000,
-      }),
-    });
+    // Try GPT-5 first, then GPT-4o as fallback
+    let chatResponse;
+    let modelUsed = 'gpt-5';
+    
+    const tryModel = async (model: string) => {
+      console.log(`Trying model: ${model} for flashcard generation`);
+      return await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert educator creating study flashcards. Generate flashcards that effectively test student understanding. Always respond with valid JSON only.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_completion_tokens: 2000,
+        }),
+      });
+    };
 
-    if (!chatResponse.ok) {
-      throw new Error(`OpenAI chat API error: ${chatResponse.statusText}`);
+    // First attempt with GPT-5
+    try {
+      chatResponse = await tryModel('gpt-5');
+      if (chatResponse.ok) {
+        const testData = await chatResponse.json();
+        const testResponse = testData.choices[0].message.content;
+        // Check if response is meaningful (not empty and looks like JSON)
+        if (testResponse && testResponse.trim().length > 20 && (testResponse.includes('[') || testResponse.includes('{'))) {
+          console.log('GPT-5 flashcard response successful');
+          modelUsed = 'gpt-5';
+        } else {
+          console.log('GPT-5 flashcard response invalid, trying fallback');
+          throw new Error('Response invalid');
+        }
+      } else {
+        console.log(`GPT-5 failed with status: ${chatResponse.status}`);
+        throw new Error(`GPT-5 failed with status: ${chatResponse.status}`);
+      }
+    } catch (error) {
+      console.log('GPT-5 failed for flashcards, trying GPT-4o fallback:', error.message);
+      try {
+        chatResponse = await tryModel('gpt-4o');
+        modelUsed = 'gpt-4o';
+        console.log('Using GPT-4o fallback for flashcards');
+      } catch (fallbackError) {
+        console.log('Both models failed for flashcards:', fallbackError.message);
+        throw new Error(`All OpenAI models failed: ${fallbackError.message}`);
+      }
+    }
+
+    if (!chatResponse || !chatResponse.ok) {
+      throw new Error(`OpenAI chat API error: ${chatResponse?.statusText || 'No response'}`);
     }
 
     const chatData = await chatResponse.json();
@@ -151,7 +188,7 @@ Generate exactly ${count} flashcards in JSON format:`;
       answer: card.answer.trim()
     }));
 
-    console.log(`Generated ${validFlashcards.length} valid flashcards`);
+    console.log(`Generated ${validFlashcards.length} valid flashcards using ${modelUsed}`);
 
     return new Response(JSON.stringify({ 
       flashcards: validFlashcards,

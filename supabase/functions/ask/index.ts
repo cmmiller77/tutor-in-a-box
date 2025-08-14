@@ -298,32 +298,72 @@ Please provide a detailed answer based on the course materials above, and refere
 
     console.log('Generating AI response...');
 
-    const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: userPrompt
-          }
-        ],
-        max_completion_tokens: 1500, // More tokens for comprehensive answers
-      }),
-    });
+    // Try GPT-5 first, then GPT-4o as fallback
+    let chatResponse;
+    let modelUsed = 'gpt-5';
+    
+    const tryModel = async (model: string) => {
+      console.log(`Trying model: ${model}`);
+      return await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: userPrompt
+            }
+          ],
+          max_completion_tokens: 1500,
+        }),
+      });
+    };
 
-    if (!chatResponse.ok) {
-      console.log('ERROR: OpenAI chat completion failed:', chatResponse.status);
-      const errorText = await chatResponse.text();
-      console.log('OpenAI error details:', errorText);
+    // First attempt with GPT-5
+    try {
+      chatResponse = await tryModel('gpt-5');
+      if (chatResponse.ok) {
+        const testData = await chatResponse.json();
+        const testAnswer = testData.choices[0].message.content;
+        // Check if response is meaningful (not empty or too short)
+        if (testAnswer && testAnswer.trim().length > 50) {
+          console.log('GPT-5 response successful');
+          modelUsed = 'gpt-5';
+        } else {
+          console.log('GPT-5 response too short, trying fallback');
+          throw new Error('Response too short');
+        }
+      } else {
+        console.log(`GPT-5 failed with status: ${chatResponse.status}`);
+        throw new Error(`GPT-5 failed with status: ${chatResponse.status}`);
+      }
+    } catch (error) {
+      console.log('GPT-5 failed, trying GPT-4o fallback:', error.message);
+      try {
+        chatResponse = await tryModel('gpt-4o');
+        modelUsed = 'gpt-4o';
+        console.log('Using GPT-4o fallback');
+      } catch (fallbackError) {
+        console.log('Both models failed:', fallbackError.message);
+        chatResponse = null;
+      }
+    }
+
+    if (!chatResponse || !chatResponse.ok) {
+      console.log('ERROR: All OpenAI models failed');
+      let errorText = '';
+      if (chatResponse) {
+        errorText = await chatResponse.text();
+        console.log('OpenAI error details:', errorText);
+      }
       
       // Fallback to a basic response if OpenAI fails
       const fallbackAnswer = `Based on your course materials, here's what I found:\n\n${context.slice(0, 1000)}...\n\nI'm having trouble generating a detailed response right now, but the above content from your materials should help answer your question about: ${query}`;
@@ -350,7 +390,7 @@ Please provide a detailed answer based on the course materials above, and refere
     const answer = chatData.choices[0].message.content;
     responseGenerated = true;
 
-    console.log('Generated comprehensive AI answer based on course materials');
+    console.log(`Generated comprehensive AI answer using ${modelUsed}`);
 
     // Format sources with similarity scores
     const sources = similarChunks.map((chunk: any, index: number) => ({
