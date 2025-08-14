@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -58,6 +58,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          school: string | null
           subject: string
           teacher_id: string
           updated_at: string
@@ -69,6 +70,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          school?: string | null
           subject: string
           teacher_id: string
           updated_at?: string
@@ -80,6 +82,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          school?: string | null
           subject?: string
           teacher_id?: string
           updated_at?: string
@@ -313,28 +316,28 @@ export type Database = {
       }
       log_question_with_class: {
         Args: {
-          p_user_id: string
-          p_question: string
           p_class_id?: string
-          p_sources_found?: number
+          p_question: string
           p_response_generated?: boolean
+          p_sources_found?: number
+          p_user_id: string
         }
         Returns: string
       }
       match_chunks: {
         Args: {
-          query_embedding: string
-          match_threshold: number
           match_count: number
+          match_threshold: number
+          query_embedding: string
           user_id: string
         }
         Returns: {
-          id: string
           chunk_id: string
-          text: string
+          id: string
           page_number: number
-          source_file: string
           similarity: number
+          source_file: string
+          text: string
         }[]
       }
       sparsevec_out: {

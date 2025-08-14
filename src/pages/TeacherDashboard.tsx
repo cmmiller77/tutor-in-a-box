@@ -17,6 +17,7 @@ interface ClassItem {
   name: string;
   subject: string;
   description?: string;
+  school?: string;
   student_count: number;
   class_code: string;
 }
@@ -26,7 +27,7 @@ const TeacherDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newClass, setNewClass] = useState({ name: "", subject: "", description: "" });
+  const [newClass, setNewClass] = useState({ name: "", subject: "", description: "", school: "" });
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -74,6 +75,7 @@ const TeacherDashboard = () => {
           name,
           subject,
           description,
+          school,
           class_code,
           enrollments(count)
         `)
@@ -95,6 +97,7 @@ const TeacherDashboard = () => {
         name: classItem.name,
         subject: classItem.subject,
         description: classItem.description,
+        school: classItem.school,
         class_code: classItem.class_code,
         student_count: classItem.enrollments?.length || 0,
       })) || [];
@@ -108,7 +111,7 @@ const TeacherDashboard = () => {
   };
 
   const handleCreateClass = async () => {
-    if (!newClass.name || !newClass.subject) {
+    if (!newClass.name || !newClass.subject || !newClass.school) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -137,6 +140,7 @@ const TeacherDashboard = () => {
           name: newClass.name,
           subject: newClass.subject,
           description: newClass.description || null,
+          school: newClass.school,
           class_code: classCode
         })
         .select()
@@ -152,13 +156,14 @@ const TeacherDashboard = () => {
         name: newClassData.name,
         subject: newClassData.subject,
         description: newClassData.description,
+        school: newClassData.school,
         class_code: newClassData.class_code,
         student_count: 0,
       };
       
       setClasses(prev => [...prev, newClassItem]);
       setShowCreateDialog(false);
-      setNewClass({ name: "", subject: "", description: "" });
+      setNewClass({ name: "", subject: "", description: "", school: "" });
       
       toast({
         title: "Success!",
@@ -242,6 +247,16 @@ const TeacherDashboard = () => {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="school">School *</Label>
+                    <Input
+                      id="school"
+                      type="text"
+                      placeholder="e.g., Lincoln High School"
+                      value={newClass.school}
+                      onChange={(e) => setNewClass(prev => ({ ...prev, school: e.target.value }))}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="description">Description</Label>
                     <Input
                       id="description"
@@ -300,7 +315,10 @@ const TeacherDashboard = () => {
                           <span>{classItem.name}</span>
                           <BookOpen className="w-5 h-5 text-primary" />
                         </CardTitle>
-                        <CardDescription>{classItem.subject}</CardDescription>
+                        <CardDescription>
+                          {classItem.subject}
+                          {classItem.school && ` • ${classItem.school}`}
+                        </CardDescription>
                       </CardHeader>
                       <CardContent>
                         {classItem.description && (

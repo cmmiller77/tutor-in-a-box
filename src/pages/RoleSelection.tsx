@@ -11,7 +11,6 @@ import Header from "@/components/Header";
 
 const RoleSelection = () => {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [school, setSchool] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -38,15 +37,10 @@ const RoleSelection = () => {
         return;
       }
 
-      // Update user profile with role and school (if student)
-      const updateData: any = { role: selectedRole };
-      if (selectedRole === "student" && school) {
-        updateData.school = school;
-      }
-
+      // Update user profile with role
       const { error } = await supabase
         .from("profiles")
-        .update(updateData)
+        .update({ role: selectedRole })
         .eq("user_id", session.user.id);
 
       if (error) {
@@ -128,26 +122,10 @@ const RoleSelection = () => {
             </Card>
           </div>
 
-          {selectedRole === "student" && (
-            <Card className="mb-6">
-              <CardContent className="pt-6">
-                <Label htmlFor="school">What school do you attend?</Label>
-                <Input
-                  id="school"
-                  type="text"
-                  placeholder="Enter your school name"
-                  value={school}
-                  onChange={(e) => setSchool(e.target.value)}
-                  className="mt-2"
-                />
-              </CardContent>
-            </Card>
-          )}
-
           <div className="text-center">
             <Button 
               onClick={handleRoleSelection}
-              disabled={!selectedRole || (selectedRole === "student" && !school) || loading}
+              disabled={!selectedRole || loading}
               variant="hero"
               size="lg"
               className="px-8"

@@ -15,6 +15,7 @@ interface ClassItem {
   name: string;
   subject: string;
   teacher: string;
+  school?: string;
   description?: string;
   ai_enabled: boolean;
 }
@@ -76,6 +77,7 @@ const StudentDashboard = () => {
             name,
             subject,
             description,
+            school,
             teacher_id,
             ai_enabled
           )
@@ -108,6 +110,7 @@ const StudentDashboard = () => {
           name: classData.name,
           subject: classData.subject,
           description: classData.description,
+          school: classData.school,
           teacher: teacher ? `${teacher.first_name} ${teacher.last_name}` : "Unknown Teacher",
           ai_enabled: classData.ai_enabled,
         };
@@ -292,6 +295,7 @@ const StudentDashboard = () => {
                     </CardTitle>
                     <CardDescription>
                       {classItem.subject} • {classItem.teacher}
+                      {classItem.school && ` • ${classItem.school}`}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
