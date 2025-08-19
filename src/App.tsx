@@ -14,6 +14,7 @@ import ClassDashboard from "./pages/ClassDashboard";
 import ClassAITutor from "./pages/ClassAITutor";
 import StudentDashboard from "./pages/StudentDashboard";
 import AITutorDashboard from "./pages/AITutorDashboard";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/class/:classId/ai-tutor" element={<ClassAITutor />} />
           <Route path="/student-dashboard" element={<StudentDashboard />} />
           <Route path="/ai-tutor" element={<AITutorDashboard />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

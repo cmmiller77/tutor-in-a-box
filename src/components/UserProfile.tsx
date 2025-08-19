@@ -86,7 +86,10 @@ const UserProfile = ({ user }: UserProfileProps) => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-card">
-        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+        <DropdownMenuItem 
+          onClick={() => navigate("/profile")}
+          className="flex items-center gap-2 cursor-pointer"
+        >
           <UserIcon className="h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
