@@ -258,52 +258,36 @@ const Profile = () => {
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
 
-                <div className="pt-6 border-t border-destructive/20">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-destructive">Danger Zone</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Once you delete your account, there is no going back. Please be certain.
-                      </p>
-                    </div>
-                    
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="destructive" 
-                          disabled={deleting}
-                          className="w-full md:w-auto"
+                <div className="pt-6 border-t">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        disabled={deleting}
+                        className="w-full md:w-auto"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {deleting ? "Deleting..." : "Delete Account"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure you want to delete your account?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. All your account data and information will be permanently deleted, including your profile, uploaded documents, classes, and analytics.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleDeleteProfile}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {deleting ? "Deleting..." : "Delete Account"}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete your
-                            account and remove all of your data from our servers, including:
-                            <ul className="list-disc list-inside mt-2 space-y-1">
-                              <li>Your profile information</li>
-                              <li>All uploaded documents and course materials</li>
-                              <li>Class enrollments and question analytics</li>
-                              <li>Any classes you've created (if you're a teacher)</li>
-                            </ul>
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={handleDeleteProfile}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Yes, delete my account
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                          Yes, delete my account
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </CardContent>
