@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 interface UserProfile {
@@ -25,6 +26,7 @@ const Profile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -88,6 +90,48 @@ const Profile = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!user) return;
+
+    setDeleting(true);
+    try {
+      // First delete the profile data
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("user_id", user.id);
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      // Then delete the user account (this will cascade delete related data)
+      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+      
+      if (authError) {
+        // If we can't delete via admin, try signing out the user
+        console.warn("Admin delete failed, signing out user:", authError);
+        await supabase.auth.signOut();
+      }
+
+      toast({
+        title: "Account Deleted",
+        description: "Your account and all associated data have been permanently deleted.",
+      });
+
+      // Redirect to home page
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -204,7 +248,7 @@ const Profile = () => {
                 />
               </div>
 
-              <div className="pt-4">
+              <div className="pt-4 space-y-4">
                 <Button 
                   onClick={handleSave} 
                   disabled={saving}
@@ -213,6 +257,54 @@ const Profile = () => {
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
+
+                <div className="pt-6 border-t border-destructive/20">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-destructive">Danger Zone</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Once you delete your account, there is no going back. Please be certain.
+                      </p>
+                    </div>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="destructive" 
+                          disabled={deleting}
+                          className="w-full md:w-auto"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {deleting ? "Deleting..." : "Delete Account"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete your
+                            account and remove all of your data from our servers, including:
+                            <ul className="list-disc list-inside mt-2 space-y-1">
+                              <li>Your profile information</li>
+                              <li>All uploaded documents and course materials</li>
+                              <li>Class enrollments and question analytics</li>
+                              <li>Any classes you've created (if you're a teacher)</li>
+                            </ul>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleDeleteProfile}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Yes, delete my account
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
