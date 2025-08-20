@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, MessageSquare, BookOpen, TrendingUp, Users, Activity } from "lucide-react";
+import { Calendar, MessageSquare, BookOpen, TrendingUp, Users, Activity, Trash2 } from "lucide-react";
 
 interface QuestionData {
   id: string;
@@ -53,6 +55,7 @@ const QuestionAnalytics = ({ classId, className }: QuestionAnalyticsProps) => {
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [successRate, setSuccessRate] = useState(0);
   const [activeStudents, setActiveStudents] = useState(0);
+  const [clearingHistory, setClearingHistory] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -222,6 +225,54 @@ const QuestionAnalytics = ({ classId, className }: QuestionAnalyticsProps) => {
       .slice(0, 10);
   };
 
+  const handleClearHistory = async () => {
+    if (!classId) return;
+    
+    setClearingHistory(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to clear question history.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await supabase.functions.invoke('clear-question-history', {
+        body: { classId },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to clear question history');
+      }
+
+      const { deletedCount } = response.data;
+      
+      toast({
+        title: "Success",
+        description: `Cleared ${deletedCount} question records from this class.`,
+      });
+
+      // Refresh the analytics data
+      fetchAnalyticsData();
+      
+    } catch (error) {
+      console.error("Error clearing history:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to clear question history.",
+        variant: "destructive",
+      });
+    } finally {
+      setClearingHistory(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -246,9 +297,41 @@ const QuestionAnalytics = ({ classId, className }: QuestionAnalyticsProps) => {
   return (
     <div className="space-y-6">
       {className && (
-        <div className="mb-4">
-          <h3 className="text-xl font-semibold">{className} Analytics</h3>
-          <p className="text-muted-foreground">Question analytics for this class</p>
+        <div className="mb-4 flex justify-between items-start">
+          <div>
+            <h3 className="text-xl font-semibold">{className} Analytics</h3>
+            <p className="text-muted-foreground">Question analytics for this class</p>
+          </div>
+          {classId && totalQuestions > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                  <Trash2 className="w-4 h-4" />
+                  Clear History
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear Question History</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all {totalQuestions} question records for this class. 
+                    This action cannot be undone. Students will be able to ask new questions normally, 
+                    but all previous analytics data will be lost.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleClearHistory}
+                    disabled={clearingHistory}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {clearingHistory ? "Clearing..." : "Clear History"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       )}
       {/* Overview Cards */}
