@@ -151,7 +151,8 @@ const UploadSection: React.FC<UploadSectionProps> = ({ classId }) => {
             
             await page.render({
               canvasContext: context,
-              viewport: viewport
+              viewport: viewport,
+              canvas: canvas
             }).promise;
             
             const { data: { text } } = await worker.recognize(canvas);
