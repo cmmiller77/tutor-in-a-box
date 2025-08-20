@@ -105,9 +105,8 @@ const UploadSection: React.FC<UploadSectionProps> = ({ classId }) => {
       // Import PDF.js dynamically
       const pdfjsLib = await import('pdfjs-dist');
       
-      // Set worker source to use the bundled worker
-      const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.js?url');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default;
+      // Set worker source - use CDN for reliability
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js`;
       
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       let extractedText = '';
