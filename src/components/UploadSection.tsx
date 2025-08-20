@@ -16,7 +16,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ classId }) => {
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
-  const [extractionMethod, setExtractionMethod] = useState<'server' | 'local' | 'text'>('server');
+  const [extractionMethod, setExtractionMethod] = useState<'server' | 'local' | 'text'>('local');
   const [localProgress, setLocalProgress] = useState<string>('');
   const [useLocalOCR, setUseLocalOCR] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -272,8 +272,22 @@ const UploadSection: React.FC<UploadSectionProps> = ({ classId }) => {
 
       if (processError) {
         console.error('Processing error:', processError);
-        toast.error(`Processing failed: ${processError.message}`);
-        return;
+        
+        // Check if it's the "server unavailable" error and fallback to local extraction
+        if (processError.message && processError.message.includes('Server extraction unavailable')) {
+          console.log('Server extraction unavailable, falling back to local extraction...');
+          toast.info('Server extraction unavailable, using local extraction instead');
+          
+          // Fallback to local extraction
+          setProcessing(true);
+          toast.info('Processing text content...');
+          const text = await extractTextLocally(file);
+          await processTextDirectly(text, file.name, 'local');
+          return;
+        } else {
+          toast.error(`Processing failed: ${processError.message}`);
+          return;
+        }
       }
 
       setUploadedFile(file.name);
