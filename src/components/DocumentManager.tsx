@@ -14,6 +14,8 @@ interface DocumentItem {
   created_at: string;
   user_id: string;
   chunk_count: number;
+  sample_text?: string;
+  total_length?: number;
 }
 
 interface DocumentManagerProps {

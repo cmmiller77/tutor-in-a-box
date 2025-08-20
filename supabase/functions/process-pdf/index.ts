@@ -1,8 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-// Import PDF.js for real PDF text extraction
-import * as pdfjs from 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.mjs';
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,180 +9,159 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('=== PROCESSING PDF ===');
-  
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('=== Processing PDF Request ===');
-    console.log('Content-Type:', req.headers.get('content-type'));
-    console.log('Request method:', req.method);
+    console.log('=== PDF PROCESSING STARTED ===');
     
-    // Parse request body - Supabase functions.invoke automatically handles JSON
     const { filePath, filename } = await req.json();
-    console.log('Parsed body:', { filePath, filename });
+    console.log('Processing file:', filename, 'at path:', filePath);
     
     if (!filePath || !filename) {
-      throw new Error('Missing required fields: filePath and filename');
+      console.error('❌ Missing required fields:', { filePath, filename });
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: filePath and filename' }),
+        { status: 400, headers: corsHeaders }
+      );
     }
     
-    console.log('Processing file:', filePath, filename);
-    
-    // Check environment
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!openaiApiKey || !supabaseUrl || !supabaseKey) {
-      throw new Error('Missing environment variables');
-    }
-    
-    // Setup Supabase and authenticate
-    console.log('Authenticating user...');
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
+    // Get Authorization header
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('No authorization header');
+    if (!authHeader) {
+      console.error('❌ No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Authorization header required' }),
+        { status: 401, headers: corsHeaders }
+      );
+    }
 
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Authenticate user
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace('Bearer ', '')
     );
 
     if (authError || !user) {
-      console.error('Auth error:', authError);
-      throw new Error('Authentication failed');
+      console.error('❌ Authentication failed:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Authentication failed' }),
+        { status: 401, headers: corsHeaders }
+      );
     }
-    
+
     console.log('User authenticated:', user.id);
-    
+
     // Download the PDF file from storage
-    console.log('Downloading PDF from storage...');
+    console.log('📄 Downloading PDF from storage...');
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('pdfs')
       .download(filePath);
       
     if (downloadError || !fileData) {
-      console.error('Download error:', downloadError);
-      throw new Error('Failed to download PDF file');
+      console.error('❌ Download error:', downloadError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to download PDF file' }),
+        { status: 500, headers: corsHeaders }
+      );
     }
     
-    console.log('PDF downloaded, size:', fileData.size, 'bytes');
+    console.log('✅ PDF downloaded, size:', fileData.size, 'bytes');
     
-    // Extract real text from PDF using PDF.js
-    let pdfText = '';
+    // Convert file data to buffer for PDF.js
+    const pdfBuffer = await fileData.arrayBuffer();
+    let extractedText = '';
+    let extractedPages = 0;
     let totalPages = 0;
     
     try {
-      console.log('Starting real PDF text extraction...');
+      console.log('🔄 Starting PDF text extraction...');
       
-      // Convert the file blob to ArrayBuffer
-      const arrayBuffer = await fileData.arrayBuffer();
-      console.log('PDF ArrayBuffer size:', arrayBuffer.byteLength);
-      
-      // Load PDF document
-      const pdf = await pdfjs.getDocument({
-        data: new Uint8Array(arrayBuffer),
+      // Configure PDF.js properly for Deno environment
+      const pdf = await pdfjsLib.getDocument({
+        data: pdfBuffer,
         useSystemFonts: true,
+        disableFontFace: true,
+        useWorkerFetch: false,
+        isEvalSupported: false,
       }).promise;
       
       totalPages = pdf.numPages;
-      console.log(`PDF has ${totalPages} pages`);
-      
-      // Extract text from each page
-      const pageTexts = [];
+      console.log(`📄 PDF loaded with ${totalPages} pages`);
+
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
         try {
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
-          
-          // Combine text items into readable text
           const pageText = textContent.items
             .map((item: any) => item.str)
             .join(' ')
-            .replace(/\s+/g, ' ')
             .trim();
           
-          if (pageText.length > 10) { // Only include pages with meaningful content
-            pageTexts.push({
-              pageNumber: pageNum,
-              text: pageText
-            });
-            console.log(`Page ${pageNum}: extracted ${pageText.length} characters`);
+          if (pageText && pageText.length > 10) { // Only count meaningful text
+            extractedText += `\n\n--- Page ${pageNum} ---\n${pageText}`;
+            extractedPages++;
+            console.log(`✅ Page ${pageNum}: ${pageText.length} characters extracted`);
           } else {
-            console.log(`Page ${pageNum}: skipped (minimal content)`);
+            console.log(`⚠️  Page ${pageNum}: No meaningful text found (possibly scanned)`);
           }
         } catch (pageError) {
-          console.error(`Error processing page ${pageNum}:`, pageError.message);
+          console.error(`❌ Error processing page ${pageNum}:`, pageError);
         }
       }
       
-      // Combine all page texts
-      pdfText = pageTexts.map(p => p.text).join('\n\n');
-      console.log(`Total extracted text length: ${pdfText.length} characters`);
-      
-      // Check if extraction was successful
-      if (pdfText.length < 100) {
-        console.warn('Very little text extracted - PDF might be scanned or image-based');
-        throw new Error('Insufficient text extracted from PDF');
-      }
-      
-    } catch (extractionError) {
-      console.error('PDF text extraction failed:', extractionError.message);
-      
-      // OCR fallback for scanned PDFs
-      const ocrApiKey = Deno.env.get('OCR_SPACE_API_KEY');
-      if (ocrApiKey && fileData.size < 10 * 1024 * 1024) { // Only try OCR for files < 10MB
-        try {
-          console.log('Attempting OCR fallback...');
-          
-          const formData = new FormData();
-          formData.append('file', fileData, filename);
-          formData.append('apikey', ocrApiKey);
-          formData.append('language', 'eng');
-          formData.append('isOverlayRequired', 'false');
-          formData.append('filetype', 'PDF');
-          
-          const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (ocrResponse.ok) {
-            const ocrResult = await ocrResponse.json();
-            if (ocrResult.ParsedResults && ocrResult.ParsedResults[0]) {
-              pdfText = ocrResult.ParsedResults[0].ParsedText || '';
-              console.log(`OCR extracted ${pdfText.length} characters`);
-            }
-          }
-        } catch (ocrError) {
-          console.error('OCR fallback failed:', ocrError.message);
-        }
-      }
-      
-      // Final fallback - use filename-based content with clear indication
-      if (pdfText.length < 50) {
-        console.log('Using fallback content with filename-based hints');
-        pdfText = `[Note: This appears to be a ${filename} document. The text extraction may have failed due to the PDF format or encoding. Please try re-uploading the document or contact support.]
-        
-        Document: ${filename}
-        
-        This document appears to contain educational content. Due to technical limitations in processing this specific PDF format, the full text content could not be extracted automatically. This may happen with:
-        - Scanned documents or image-based PDFs
-        - Password-protected PDFs  
-        - PDFs with complex formatting or unusual encoding
-        
-        To get better results:
-        1. Try converting the PDF to a text-searchable format
-        2. Re-upload the document
-        3. Contact support if the issue persists
-        
-        The system will still attempt to help with questions, but responses may be limited without the full document content.`;
-      }
+      console.log(`📊 Extraction summary: ${extractedPages}/${totalPages} pages with text`);
+    } catch (pdfError) {
+      console.error('❌ PDF text extraction failed:', pdfError);
     }
-    
-    console.log('Extracted text length:', pdfText.length);
+
+    // Validate extraction results  
+    if (!extractedText || extractedText.trim().length < 100) {
+      console.log(`⚠️  Minimal text extracted (${extractedText.length} chars), this may be a scanned PDF`);
+      
+      // Provide diagnostic information instead of failing
+      extractedText = `Document processing summary for ${filename}:
+      
+Total pages: ${totalPages}
+Pages with extractable text: ${extractedPages}
+Extraction method: PDF.js native text extraction
+
+This document appears to contain primarily scanned images rather than extractable text. 
+To process this document:
+1. Use the "Extract text locally" option in the upload interface
+2. Or convert the PDF to text format using external tools
+3. Or upload the document as .txt, .docx, or .md format
+
+Note: This placeholder text has been indexed to prevent errors, but the actual document content is not searchable until properly processed.`;
+    } else {
+      console.log(`✅ Successfully extracted ${extractedText.length} characters from ${extractedPages}/${totalPages} pages`);
+      
+      // Add a summary header to help with diagnostics
+      const summary = `Document: ${filename}
+Pages processed: ${extractedPages}/${totalPages}
+Extraction method: PDF.js native text extraction
+Content length: ${extractedText.length} characters
+
+=== DOCUMENT CONTENT ===`;
+      
+      extractedText = summary + extractedText;
+    }
+
+    // Check OpenAI API key
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      console.error('❌ OpenAI API key not found');
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key not configured' }),
+        { status: 500, headers: corsHeaders }
+      );
+    }
     
     // Split text into semantic chunks (800-1200 characters each)
     console.log('Creating text chunks...');
