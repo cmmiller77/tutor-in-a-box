@@ -1,6 +1,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+// Import PDF.js for real PDF text extraction
+import * as pdfjs from 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,135 +71,166 @@ serve(async (req) => {
     
     console.log('PDF downloaded, size:', fileData.size, 'bytes');
     
-    // Convert PDF to text using pdf-parse
+    // Extract real text from PDF using PDF.js
     let pdfText = '';
+    let totalPages = 0;
+    
     try {
-      // Use a simple text extraction approach for now
-      // In a real implementation, you'd use a proper PDF parsing library
-      // For now, we'll create meaningful text chunks based on the filename
+      console.log('Starting real PDF text extraction...');
       
-      // Detect subject from filename or use a default educational text
-      const isMultivariable = filename.toLowerCase().includes('multivariable') || filename.toLowerCase().includes('calculus');
-      const isMath = filename.toLowerCase().includes('math') || isMultivariable;
+      // Convert the file blob to ArrayBuffer
+      const arrayBuffer = await fileData.arrayBuffer();
+      console.log('PDF ArrayBuffer size:', arrayBuffer.byteLength);
       
-      if (isMultivariable) {
-        pdfText = `
-        Chapter 1: Introduction to Multivariable Calculus
-        
-        Multivariable calculus extends the concepts of single-variable calculus to functions of several variables. This branch of mathematics is essential for understanding phenomena in physics, engineering, economics, and computer science where multiple factors influence outcomes.
-        
-        Chapter 2: Partial Derivatives
-        
-        A partial derivative of a function of several variables is its derivative with respect to one of those variables, with the others held constant. For a function f(x,y), the partial derivative with respect to x is denoted as ∂f/∂x.
-        
-        The geometric interpretation of partial derivatives relates to the slope of the tangent line to the curve formed by intersecting the surface z = f(x,y) with a plane parallel to one of the coordinate planes.
-        
-        Chapter 3: Multiple Integrals
-        
-        Multiple integrals extend the concept of integration to functions of several variables. Double integrals are used to find areas, volumes, and average values over regions in the plane. Triple integrals extend this to three-dimensional regions.
-        
-        The process of evaluating multiple integrals often involves changing the order of integration or using coordinate transformations such as polar, cylindrical, or spherical coordinates.
-        
-        Chapter 4: Vector Fields and Line Integrals
-        
-        A vector field assigns a vector to each point in space. Examples include velocity fields in fluid flow, electric fields in electromagnetism, and gradient fields in optimization problems.
-        
-        Line integrals allow us to integrate functions along curves, which is essential for calculating work done by forces and understanding circulation and flux in vector fields.
-        
-        Chapter 5: Green's Theorem and Applications
-        
-        Green's theorem relates line integrals around closed curves to double integrals over the regions they enclose. This fundamental theorem has applications in physics, particularly in electromagnetism and fluid dynamics.
-        `;
-      } else if (isMath) {
-        pdfText = `
-        Chapter 1: Foundations of Mathematics
-        
-        Mathematics is the study of patterns, structures, and relationships using logical reasoning and rigorous proof. It provides the language and tools for describing and analyzing the world around us.
-        
-        Chapter 2: Functions and Graphs
-        
-        A function is a relation between a set of inputs and a set of permissible outputs with the property that each input is related to exactly one output. Functions can be represented algebraically, graphically, and numerically.
-        
-        Understanding the behavior of functions through their graphs helps visualize mathematical relationships and solve real-world problems.
-        
-        Chapter 3: Limits and Continuity
-        
-        The concept of a limit describes the behavior of a function as its input approaches a particular value. Limits form the foundation for defining derivatives and integrals in calculus.
-        
-        A function is continuous at a point if the limit of the function as it approaches that point equals the function's value at that point.
-        
-        Chapter 4: Problem Solving Strategies
-        
-        Effective mathematical problem solving involves understanding the problem, devising a plan, carrying out the plan, and looking back to verify the solution.
-        
-        Common strategies include working backwards, looking for patterns, making diagrams, and breaking complex problems into simpler parts.
-        `;
-      } else {
-        // Generic educational content
-        pdfText = `
-        Introduction to Academic Learning
-        
-        This document contains educational material designed to help students understand key concepts in their field of study. Learning is most effective when information is broken down into manageable chunks and connected to prior knowledge.
-        
-        Core Concepts and Principles
-        
-        Every field of study has fundamental principles that serve as building blocks for more advanced topics. Understanding these core concepts is essential for academic success and practical application.
-        
-        Critical thinking involves analyzing information, evaluating evidence, and drawing reasonable conclusions. These skills are valuable across all disciplines and in professional settings.
-        
-        Application and Practice
-        
-        Knowledge becomes meaningful when applied to real-world situations. Practice problems, case studies, and hands-on activities help reinforce learning and develop practical skills.
-        
-        Regular review and practice are essential for long-term retention and the ability to apply knowledge in new contexts.
-        
-        Summary and Key Takeaways
-        
-        Effective learning requires active engagement with the material, regular practice, and connection to broader concepts and applications. Success comes from consistent effort and the willingness to seek help when needed.
-        `;
+      // Load PDF document
+      const pdf = await pdfjs.getDocument({
+        data: new Uint8Array(arrayBuffer),
+        useSystemFonts: true,
+      }).promise;
+      
+      totalPages = pdf.numPages;
+      console.log(`PDF has ${totalPages} pages`);
+      
+      // Extract text from each page
+      const pageTexts = [];
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        try {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          
+          // Combine text items into readable text
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          
+          if (pageText.length > 10) { // Only include pages with meaningful content
+            pageTexts.push({
+              pageNumber: pageNum,
+              text: pageText
+            });
+            console.log(`Page ${pageNum}: extracted ${pageText.length} characters`);
+          } else {
+            console.log(`Page ${pageNum}: skipped (minimal content)`);
+          }
+        } catch (pageError) {
+          console.error(`Error processing page ${pageNum}:`, pageError.message);
+        }
       }
-    } catch (parseError) {
-      console.error('PDF parsing error:', parseError);
-      // Use fallback text if parsing fails
-      pdfText = `Educational content from ${filename}. This document contains important information for learning and understanding key concepts in the subject area.`;
+      
+      // Combine all page texts
+      pdfText = pageTexts.map(p => p.text).join('\n\n');
+      console.log(`Total extracted text length: ${pdfText.length} characters`);
+      
+      // Check if extraction was successful
+      if (pdfText.length < 100) {
+        console.warn('Very little text extracted - PDF might be scanned or image-based');
+        throw new Error('Insufficient text extracted from PDF');
+      }
+      
+    } catch (extractionError) {
+      console.error('PDF text extraction failed:', extractionError.message);
+      
+      // OCR fallback for scanned PDFs
+      const ocrApiKey = Deno.env.get('OCR_SPACE_API_KEY');
+      if (ocrApiKey && fileData.size < 10 * 1024 * 1024) { // Only try OCR for files < 10MB
+        try {
+          console.log('Attempting OCR fallback...');
+          
+          const formData = new FormData();
+          formData.append('file', fileData, filename);
+          formData.append('apikey', ocrApiKey);
+          formData.append('language', 'eng');
+          formData.append('isOverlayRequired', 'false');
+          formData.append('filetype', 'PDF');
+          
+          const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (ocrResponse.ok) {
+            const ocrResult = await ocrResponse.json();
+            if (ocrResult.ParsedResults && ocrResult.ParsedResults[0]) {
+              pdfText = ocrResult.ParsedResults[0].ParsedText || '';
+              console.log(`OCR extracted ${pdfText.length} characters`);
+            }
+          }
+        } catch (ocrError) {
+          console.error('OCR fallback failed:', ocrError.message);
+        }
+      }
+      
+      // Final fallback - use filename-based content with clear indication
+      if (pdfText.length < 50) {
+        console.log('Using fallback content with filename-based hints');
+        pdfText = `[Note: This appears to be a ${filename} document. The text extraction may have failed due to the PDF format or encoding. Please try re-uploading the document or contact support.]
+        
+        Document: ${filename}
+        
+        This document appears to contain educational content. Due to technical limitations in processing this specific PDF format, the full text content could not be extracted automatically. This may happen with:
+        - Scanned documents or image-based PDFs
+        - Password-protected PDFs  
+        - PDFs with complex formatting or unusual encoding
+        
+        To get better results:
+        1. Try converting the PDF to a text-searchable format
+        2. Re-upload the document
+        3. Contact support if the issue persists
+        
+        The system will still attempt to help with questions, but responses may be limited without the full document content.`;
+      }
     }
     
     console.log('Extracted text length:', pdfText.length);
     
-    // Split text into chunks (roughly 500 characters each)
-    const chunkSize = 500;
+    // Split text into semantic chunks (800-1200 characters each)
+    console.log('Creating text chunks...');
     const chunks = [];
-    const sentences = pdfText.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    const chunkSize = 1000; // Optimal size for embeddings
+    const overlapSize = 100; // Overlap to maintain context
+    
+    // Split by paragraphs first, then by sentences if needed
+    const paragraphs = pdfText.split(/\n\s*\n/).filter(p => p.trim().length > 50);
     
     let currentChunk = '';
-    let currentPage = 1;
     let chunkIndex = 1;
+    let estimatedPage = 1;
     
-    for (const sentence of sentences) {
-      if (currentChunk.length + sentence.length > chunkSize && currentChunk.length > 0) {
+    for (let i = 0; i < paragraphs.length; i++) {
+      const paragraph = paragraphs[i].trim();
+      
+      // If adding this paragraph would exceed chunk size
+      if (currentChunk.length + paragraph.length > chunkSize && currentChunk.length > 200) {
+        // Save current chunk
         chunks.push({
           chunk_id: `${filename.replace('.pdf', '')}_chunk_${chunkIndex}`,
           text: currentChunk.trim(),
-          page_number: currentPage,
+          page_number: estimatedPage,
           source_file: filename
         });
         
-        currentChunk = sentence.trim() + '.';
+        // Start new chunk with overlap from previous chunk
+        const sentences = currentChunk.split(/[.!?]+/).filter(s => s.trim().length > 10);
+        const overlapText = sentences.slice(-2).join('.') + '.'; // Keep last 2 sentences for context
+        
+        currentChunk = overlapText + ' ' + paragraph;
         chunkIndex++;
         
-        // Simulate page breaks every 3-4 chunks
-        if (chunkIndex % 4 === 0) currentPage++;
+        // Estimate page numbers (assuming ~3000 chars per page)
+        estimatedPage = Math.ceil((chunkIndex * chunkSize) / 3000) || 1;
       } else {
-        currentChunk += ' ' + sentence.trim() + '.';
+        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
       }
     }
     
     // Add final chunk if there's remaining text
-    if (currentChunk.trim().length > 50) {
+    if (currentChunk.trim().length > 100) {
       chunks.push({
         chunk_id: `${filename.replace('.pdf', '')}_chunk_${chunkIndex}`,
         text: currentChunk.trim(),
-        page_number: currentPage,
+        page_number: estimatedPage,
         source_file: filename
       });
     }
