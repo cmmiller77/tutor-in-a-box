@@ -11,6 +11,8 @@ interface QuestionData {
   id: string;
   question: string;
   subject: string;
+  derived_subject: string;
+  derived_topics: string[];
   sources_found: number;
   response_generated: boolean;
   created_at: string;
@@ -163,20 +165,34 @@ const QuestionAnalytics = ({ classId, className }: QuestionAnalyticsProps) => {
   };
 
   const processSubjectStats = (questions: QuestionData[]): SubjectStats[] => {
-    const subjectCounts = questions.reduce((acc, q) => {
-      if (q.subject) {
+    // Use derived topics to create a more detailed subject breakdown
+    const topicCounts = questions.reduce((acc, q) => {
+      // First, try to use derived topics if available
+      if (q.derived_topics && q.derived_topics.length > 0) {
+        q.derived_topics.forEach(topic => {
+          if (topic && topic.trim()) {
+            acc[topic.trim()] = (acc[topic.trim()] || 0) + 1;
+          }
+        });
+      } 
+      // Fallback to derived subject if no topics
+      else if (q.derived_subject) {
+        acc[q.derived_subject] = (acc[q.derived_subject] || 0) + 1;
+      }
+      // Final fallback to original subject
+      else if (q.subject) {
         acc[q.subject] = (acc[q.subject] || 0) + 1;
       }
       return acc;
     }, {} as Record<string, number>);
 
-    const total = Object.values(subjectCounts).reduce((sum, count) => sum + count, 0);
+    const total = Object.values(topicCounts).reduce((sum, count) => sum + count, 0);
     
-    return Object.entries(subjectCounts)
+    return Object.entries(topicCounts)
       .map(([subject, count]) => ({
         subject,
         count,
-        percentage: Math.round((count / total) * 100)
+        percentage: total > 0 ? Math.round((count / total) * 100) : 0
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);

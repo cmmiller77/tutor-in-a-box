@@ -237,14 +237,18 @@ serve(async (req) => {
     if (!similarChunks || similarChunks.length === 0) {
       console.log('No relevant chunks found for query');
       
-      // Log analytics for no results found using the new database function
+      // Log analytics for no results found with empty derived topics
       const { error: logError } = await supabase
-        .rpc('log_question_with_class', {
-          p_user_id: user.id,
-          p_question: query,
-          p_class_id: classId,
-          p_sources_found: 0,
-          p_response_generated: false
+        .from('question_analytics')
+        .insert({
+          user_id: user.id,
+          question: query,
+          class_id: classId,
+          subject: classSubject,
+          derived_subject: null,
+          derived_topics: [],
+          sources_found: 0,
+          response_generated: false
         });
 
       if (logError) {
@@ -392,6 +396,86 @@ Please provide a detailed answer based on the course materials above, and refere
 
     console.log(`Generated comprehensive AI answer using ${modelUsed}`);
 
+    // Step 5: Classify question topics using AI
+    console.log('Classifying question topics...');
+    let derivedSubject = null;
+    let derivedTopics = [];
+
+    try {
+      const classificationPrompt = `Analyze this student question and the provided course materials to extract the specific academic topics and subject areas being discussed.
+
+QUESTION: ${query}
+
+COURSE MATERIALS CONTEXT:
+${context.slice(0, 2000)}
+
+Please provide:
+1. The main subject area (e.g., "Mathematics", "Physics", "Computer Science", "Biology", etc.)
+2. Specific topics within that subject (e.g., "partial derivatives", "integration by parts", "neural networks", "cell division", etc.)
+
+Respond in JSON format:
+{
+  "subject": "Main Subject Area",
+  "topics": ["specific topic 1", "specific topic 2", "specific topic 3"]
+}
+
+Focus on the actual academic concepts being discussed, not generic terms.`;
+
+      const classificationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Use fast model for classification
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an academic subject classifier. Extract specific academic topics and subjects from questions and course materials.'
+            },
+            {
+              role: 'user',
+              content: classificationPrompt
+            }
+          ],
+          max_tokens: 200,
+          temperature: 0.3,
+        }),
+      });
+
+      if (classificationResponse.ok) {
+        const classificationData = await classificationResponse.json();
+        const classificationText = classificationData.choices[0].message.content;
+        
+        try {
+          const parsed = JSON.parse(classificationText);
+          derivedSubject = parsed.subject;
+          derivedTopics = Array.isArray(parsed.topics) ? parsed.topics : [];
+          console.log('Classified subject:', derivedSubject);
+          console.log('Classified topics:', derivedTopics);
+        } catch (parseError) {
+          console.log('Failed to parse classification JSON, extracting manually');
+          // Fallback: try to extract subject and topics manually
+          const subjectMatch = classificationText.match(/"subject":\s*"([^"]+)"/);
+          const topicsMatch = classificationText.match(/"topics":\s*\[(.*?)\]/);
+          
+          if (subjectMatch) derivedSubject = subjectMatch[1];
+          if (topicsMatch) {
+            try {
+              derivedTopics = JSON.parse(`[${topicsMatch[1]}]`);
+            } catch (e) {
+              console.log('Failed to parse topics array');
+            }
+          }
+        }
+      } else {
+        console.log('Classification request failed:', classificationResponse.status);
+      }
+    } catch (classificationError) {
+      console.log('Topic classification failed:', classificationError.message);
+    }
+
     // Format sources with similarity scores
     const sources = similarChunks.map((chunk: any, index: number) => ({
       id: index + 1,
@@ -409,14 +493,18 @@ Please provide a detailed answer based on the course materials above, and refere
 
     console.log('Returning successful response');
 
-    // Log successful analytics using the new database function
+    // Log successful analytics with derived topics using direct SQL
     const { error: logError } = await supabase
-      .rpc('log_question_with_class', {
-        p_user_id: user.id,
-        p_question: query,
-        p_class_id: classId,
-        p_sources_found: sourcesFound,
-        p_response_generated: responseGenerated
+      .from('question_analytics')
+      .insert({
+        user_id: user.id,
+        question: query,
+        class_id: classId,
+        subject: classSubject,
+        derived_subject: derivedSubject,
+        derived_topics: derivedTopics,
+        sources_found: sourcesFound,
+        response_generated: responseGenerated
       });
 
     if (logError) {

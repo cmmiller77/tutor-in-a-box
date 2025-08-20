@@ -197,6 +197,8 @@ export type Database = {
         Row: {
           class_id: string | null
           created_at: string
+          derived_subject: string | null
+          derived_topics: string[] | null
           id: string
           question: string
           response_generated: boolean | null
@@ -207,6 +209,8 @@ export type Database = {
         Insert: {
           class_id?: string | null
           created_at?: string
+          derived_subject?: string | null
+          derived_topics?: string[] | null
           id?: string
           question: string
           response_generated?: boolean | null
@@ -217,6 +221,8 @@ export type Database = {
         Update: {
           class_id?: string | null
           created_at?: string
+          derived_subject?: string | null
+          derived_topics?: string[] | null
           id?: string
           question?: string
           response_generated?: boolean | null
