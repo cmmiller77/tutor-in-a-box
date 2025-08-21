@@ -5,6 +5,10 @@ import { Upload, FileText, CheckCircle, Loader2, AlertCircle } from "lucide-reac
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import uploadIcon from "@/assets/upload-icon.jpg"
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Set up PDF.js worker from CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
 
 interface UploadSectionProps {
   classId?: string;
@@ -80,64 +84,75 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
         throw new Error('Please sign in to upload files')
       }
 
-      // Upload file
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const uploadResponse = await supabase.functions.invoke('upload-pdf', {
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      })
-
-      if (uploadResponse.error) {
-        throw new Error(uploadResponse.error.message || 'Failed to upload file')
-      }
-
-      const uploadData = uploadResponse.data
-      console.log('Upload successful:', uploadData)
-
       setUploading(false)
       setProcessing(true)
       setUploadedFile(file.name)
 
       toast({
-        title: "File uploaded successfully",
-        description: "Converting PDF to text...",
+        title: "Processing PDF",
+        description: "Extracting text from your document...",
       })
 
-      // Convert PDF to text
-      const convertResponse = await supabase.functions.invoke('convert-pdf-to-text', {
-        body: {
-          filePath: uploadData.filePath,
-          filename: file.name
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      })
-
-      if (convertResponse.error) {
-        console.error('Convert response error:', convertResponse.error)
-        console.error('Convert response data:', convertResponse.data)
-        throw new Error(convertResponse.error.message || 'Failed to convert PDF')
+      // Extract text from PDF using PDF.js
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      const pageCount = pdf.numPages
+      
+      let fullText = ''
+      
+      // Extract text from all pages
+      for (let i = 1; i <= pageCount; i++) {
+        const page = await pdf.getPage(i)
+        const textContent = await page.getTextContent()
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ')
+        fullText += pageText + '\n\n'
       }
 
-      console.log('Conversion successful:', convertResponse.data)
+      // Clean up the text
+      fullText = fullText.trim()
+      
+      if (!fullText || fullText.length < 100) {
+        throw new Error('Could not extract meaningful text from the PDF. Please ensure it contains readable text.')
+      }
+
+      // Calculate file size for metadata
+      const fileSizeKB = Math.round(file.size / 1024)
+
+      // Save document directly to Supabase documents table
+      const { data: documentData, error: insertError } = await supabase
+        .from('documents')
+        .insert({
+          user_id: session.user.id,
+          filename: file.name,
+          title: file.name.replace('.pdf', ''),
+          content: fullText,
+          file_size: fileSizeKB,
+          page_count: pageCount
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error('Error saving document:', insertError)
+        throw new Error('Failed to save document to database')
+      }
+
+      console.log('Document saved successfully:', documentData)
 
       toast({
-        title: "PDF converted successfully",
-        description: `Document converted to text (${convertResponse.data.pageCount} pages). You can now ask questions about your document!`,
+        title: "PDF processed successfully",
+        description: `Document extracted (${pageCount} pages, ${fileSizeKB}KB). You can now ask questions about your document!`,
       })
 
       setProcessing(false)
 
     } catch (error) {
-      console.error('Error uploading/processing file:', error)
+      console.error('Error processing file:', error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to upload and process file",
+        description: error instanceof Error ? error.message : "Failed to process file",
         variant: "destructive",
       })
       setUploading(false)
@@ -200,9 +215,9 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
                   </>
                 ) : processing ? (
                   <>
-                    <h3 className="text-xl font-semibold mb-2">Converting PDF...</h3>
+                    <h3 className="text-xl font-semibold mb-2">Extracting Text...</h3>
                     <p className="text-muted-foreground mb-4">
-                      Extracting text content for AI processing
+                      Reading PDF content for AI analysis
                     </p>
                   </>
                 ) : uploadedFile ? (

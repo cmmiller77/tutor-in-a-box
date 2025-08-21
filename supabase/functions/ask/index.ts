@@ -183,36 +183,79 @@ serve(async (req) => {
     }
 
     if (!relevantDocs || relevantDocs.length === 0) {
-      console.log('No relevant documents found for query');
+      console.log('No relevant documents found with full-text search, trying broader search...');
       
-      // Log analytics for no results found
-      const { error: logError } = await supabase
-        .from('question_analytics')
-        .insert({
-          user_id: user.id,
-          question: query,
-          class_id: classId,
-          subject: classSubject,
-          derived_subject: null,
-          derived_topics: [],
-          sources_found: 0,
-          response_generated: false
-        });
-
-      if (logError) {
-        console.log('Warning: Failed to log question analytics:', logError);
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          answer: 'I could not find relevant information in your uploaded materials to answer this question. Please make sure you have uploaded course materials related to your question.',
-          sources: [],
-          query: query
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      // Enhanced fallback: try multi-keyword ILIKE search with OR conditions
+      if (searchTerms.length > 0) {
+        const filters = searchTerms
+          .filter(term => term.length > 2)
+          .slice(0, 5) // Limit to 5 terms to avoid too complex queries
+          .map(term => `content.ilike.%${term}%`)
+          .join(',');
+        
+        if (filters) {
+          const { data: broadData, error: broadError } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('user_id', user.id)
+            .or(filters)
+            .limit(3);
+            
+          if (!broadError && broadData && broadData.length > 0) {
+            relevantDocs = broadData;
+            console.log(`Found ${relevantDocs.length} documents with broader search`);
+          }
         }
-      );
+      }
+      
+      // Final fallback: get the most recent document if still no results
+      if (!relevantDocs || relevantDocs.length === 0) {
+        const { data: recentData, error: recentError } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (!recentError && recentData && recentData.length > 0) {
+          relevantDocs = recentData;
+          console.log('Using most recent document as fallback');
+        }
+      }
+      
+      // If still no documents, return no-content message
+      if (!relevantDocs || relevantDocs.length === 0) {
+        console.log('No documents found at all for this user');
+        
+        // Log analytics for no results found
+        const { error: logError } = await supabase
+          .from('question_analytics')
+          .insert({
+            user_id: user.id,
+            question: query,
+            class_id: classId,
+            subject: classSubject,
+            derived_subject: null,
+            derived_topics: [],
+            sources_found: 0,
+            response_generated: false
+          });
+
+        if (logError) {
+          console.log('Warning: Failed to log question analytics:', logError);
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            answer: 'I don\'t have any course materials uploaded for you yet. Please upload a PDF textbook or course material first, then ask your questions!',
+            sources: [],
+            query: query
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
     }
 
     console.log(`Found ${relevantDocs.length} relevant documents`);
