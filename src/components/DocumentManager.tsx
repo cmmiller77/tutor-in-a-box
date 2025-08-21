@@ -10,10 +10,13 @@ import { format } from "date-fns";
 
 interface DocumentItem {
   id: string;
-  source_file: string;
+  filename: string;
+  title: string;
+  content: string;
+  file_size: number;
+  page_count: number;
   created_at: string;
   user_id: string;
-  chunk_count: number;
 }
 
 interface DocumentManagerProps {
@@ -35,10 +38,10 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Get unique documents with chunk counts
+      // Get documents from the new documents table
       const { data, error } = await supabase
-        .from('chunks')
-        .select('id, source_file, created_at, user_id')
+        .from('documents')
+        .select('id, filename, title, content, file_size, page_count, created_at, user_id')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
 
@@ -47,24 +50,7 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
         return;
       }
 
-      // Group by source_file to get unique documents with chunk counts
-      const documentMap = new Map<string, DocumentItem>();
-      data?.forEach((chunk) => {
-        const existing = documentMap.get(chunk.source_file);
-        if (existing) {
-          existing.chunk_count += 1;
-        } else {
-          documentMap.set(chunk.source_file, {
-            id: chunk.id,
-            source_file: chunk.source_file,
-            created_at: chunk.created_at,
-            user_id: chunk.user_id,
-            chunk_count: 1,
-          });
-        }
-      });
-
-      setDocuments(Array.from(documentMap.values()));
+      setDocuments(data || []);
     } catch (error) {
       console.error('Error fetching documents:', error);
       toast({
@@ -77,30 +63,29 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
     }
   };
 
-  const deleteDocument = async (sourceFile: string) => {
+  const deleteDocument = async (documentId: string, filename: string) => {
     try {
-      setDeletingId(sourceFile);
+      setDeletingId(documentId);
       
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Please sign in to delete documents');
       }
 
-      // Delete all chunks for this document
-      const { error: chunksError } = await supabase
-        .from('chunks')
+      // Delete document from the documents table
+      const { error: docError } = await supabase
+        .from('documents')
         .delete()
-        .eq('source_file', sourceFile)
+        .eq('id', documentId)
         .eq('user_id', session.user.id);
 
-      if (chunksError) {
-        throw new Error('Failed to delete document chunks');
+      if (docError) {
+        throw new Error('Failed to delete document');
       }
 
       // Try to delete the file from storage (best effort)
       try {
-        // Extract the file path from source_file if it contains the full path
-        const filePath = sourceFile.includes('/') ? sourceFile : `${session.user.id}/${sourceFile}`;
+        const filePath = `${session.user.id}/${filename}`;
         await supabase.storage
           .from('pdfs')
           .remove([filePath]);
@@ -111,7 +96,7 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
 
       toast({
         title: "Document deleted",
-        description: "The document and all its chunks have been removed.",
+        description: "The document has been removed.",
       });
 
       // Refresh the documents list
@@ -128,15 +113,14 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
     }
   };
 
-  const downloadDocument = async (sourceFile: string) => {
+  const downloadDocument = async (filename: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Please sign in to download documents');
       }
 
-      // Extract the file path from source_file if it contains the full path
-      const filePath = sourceFile.includes('/') ? sourceFile : `${session.user.id}/${sourceFile}`;
+      const filePath = `${session.user.id}/${filename}`;
       
       const { data, error } = await supabase.storage
         .from('pdfs')
@@ -150,7 +134,7 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = sourceFile.split('/').pop() || sourceFile;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -202,7 +186,7 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
           <div className="space-y-4">
             {documents.map((doc) => (
               <div
-                key={doc.source_file}
+                key={doc.id}
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-4 flex-1">
@@ -211,7 +195,7 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium truncate">
-                      {doc.source_file.split('/').pop() || doc.source_file}
+                      {doc.title || doc.filename}
                     </h4>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                       <div className="flex items-center gap-1">
@@ -220,8 +204,14 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
                       </div>
                       <div className="flex items-center gap-1">
                         <FileText className="w-3 h-3" />
-                        <span>{doc.chunk_count} chunks</span>
+                        <span>{doc.page_count} pages</span>
                       </div>
+                      {doc.file_size && (
+                        <div className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          <span>{(doc.file_size / 1024 / 1024).toFixed(1)} MB</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -230,7 +220,7 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => downloadDocument(doc.source_file)}
+                    onClick={() => downloadDocument(doc.filename)}
                     className="flex items-center gap-2"
                   >
                     <Download className="w-4 h-4" />
@@ -243,25 +233,25 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
                         variant="outline"
                         size="sm"
                         className="text-destructive hover:text-destructive flex items-center gap-2"
-                        disabled={deletingId === doc.source_file}
+                        disabled={deletingId === doc.id}
                       >
                         <Trash2 className="w-4 h-4" />
-                        {deletingId === doc.source_file ? "Deleting..." : "Delete"}
+                        {deletingId === doc.id ? "Deleting..." : "Delete"}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Document</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete "{doc.source_file.split('/').pop()}"? 
-                          This will remove the document and all associated text chunks ({doc.chunk_count} chunks). 
+                          Are you sure you want to delete "{doc.title || doc.filename}"? 
+                          This will remove the document and all its content ({doc.page_count} pages). 
                           This action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                          onClick={() => deleteDocument(doc.source_file)}
+                          onClick={() => deleteDocument(doc.id, doc.filename)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                           Delete Document
