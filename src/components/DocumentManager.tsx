@@ -38,41 +38,49 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      let query;
-      
       if (classId) {
-        // Get documents linked to this specific class
-        query = supabase
+        // Get documents linked to this specific class - two-step process for reliability
+        const { data: classDocuments, error: classError } = await supabase
           .from('class_documents')
-          .select(`
-            documents:document_id (
-              id, filename, title, content, file_size, page_count, created_at, user_id
-            )
-          `)
-          .eq('class_id', classId)
-          .order('created_at', { ascending: false });
+          .select('document_id')
+          .eq('class_id', classId);
+
+        if (classError) {
+          console.error('Error fetching class documents:', classError);
+          return;
+        }
+
+        if (classDocuments && classDocuments.length > 0) {
+          const documentIds = classDocuments.map(cd => cd.document_id);
+          
+          const { data: documents, error: docsError } = await supabase
+            .from('documents')
+            .select('id, filename, title, content, file_size, page_count, created_at, user_id')
+            .in('id', documentIds)
+            .order('created_at', { ascending: false });
+
+          if (docsError) {
+            console.error('Error fetching documents:', docsError);
+            return;
+          }
+
+          setDocuments(documents || []);
+        } else {
+          setDocuments([]);
+        }
       } else {
         // Get all documents for the user
-        query = supabase
+        const { data, error } = await supabase
           .from('documents')
           .select('id, filename, title, content, file_size, page_count, created_at, user_id')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false });
-      }
 
-      const { data, error } = await query;
+        if (error) {
+          console.error('Error fetching documents:', error);
+          return;
+        }
 
-      if (error) {
-        console.error('Error fetching documents:', error);
-        return;
-      }
-
-      // Transform data based on query type
-      if (classId) {
-        // Extract documents from class_documents join
-        const documents = data?.map((item: any) => item.documents).filter(Boolean) || [];
-        setDocuments(documents);
-      } else {
         setDocuments(data || []);
       }
     } catch (error) {
