@@ -104,11 +104,11 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
 
       toast({
         title: "File uploaded successfully",
-        description: "Processing PDF and generating embeddings...",
+        description: "Converting PDF to text...",
       })
 
-      // Process PDF
-      const processResponse = await supabase.functions.invoke('process-pdf', {
+      // Convert PDF to text
+      const convertResponse = await supabase.functions.invoke('convert-pdf-to-text', {
         body: {
           filePath: uploadData.filePath,
           filename: file.name
@@ -118,17 +118,17 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
         },
       })
 
-      if (processResponse.error) {
-        console.error('Process response error:', processResponse.error)
-        console.error('Process response data:', processResponse.data)
-        throw new Error(processResponse.error.message || 'Failed to process PDF')
+      if (convertResponse.error) {
+        console.error('Convert response error:', convertResponse.error)
+        console.error('Convert response data:', convertResponse.data)
+        throw new Error(convertResponse.error.message || 'Failed to convert PDF')
       }
 
-      console.log('Processing successful:', processResponse.data)
+      console.log('Conversion successful:', convertResponse.data)
 
       toast({
-        title: "PDF processed successfully",
-        description: `Generated embeddings for ${processResponse.data.chunksProcessed} text chunks. You can now ask questions about your document!`,
+        title: "PDF converted successfully",
+        description: `Document converted to text (${convertResponse.data.pageCount} pages). You can now ask questions about your document!`,
       })
 
       setProcessing(false)
@@ -200,9 +200,9 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
                   </>
                 ) : processing ? (
                   <>
-                    <h3 className="text-xl font-semibold mb-2">Processing PDF...</h3>
+                    <h3 className="text-xl font-semibold mb-2">Converting PDF...</h3>
                     <p className="text-muted-foreground mb-4">
-                      Extracting text and generating embeddings
+                      Extracting text content for AI processing
                     </p>
                   </>
                 ) : uploadedFile ? (

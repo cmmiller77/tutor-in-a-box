@@ -7,8 +7,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to extract relevant excerpts from document content
+function extractRelevantExcerpts(content: string, searchTerms: string[], maxLength: number = 800): string {
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
+  const relevantSentences: { sentence: string; score: number; index: number }[] = [];
+  
+  // Score sentences based on search term matches
+  sentences.forEach((sentence, index) => {
+    const lowerSentence = sentence.toLowerCase();
+    let score = 0;
+    
+    searchTerms.forEach(term => {
+      const termCount = (lowerSentence.match(new RegExp(term.toLowerCase(), 'g')) || []).length;
+      score += termCount * term.length; // Weight longer terms more heavily
+    });
+    
+    if (score > 0) {
+      relevantSentences.push({ sentence: sentence.trim(), score, index });
+    }
+  });
+  
+  // Sort by score and position, take top sentences
+  relevantSentences.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.index - b.index; // Prefer earlier sentences if scores are equal
+  });
+  
+  let result = '';
+  let currentLength = 0;
+  
+  for (const item of relevantSentences) {
+    const addition = (result ? '. ' : '') + item.sentence + '.';
+    if (currentLength + addition.length > maxLength && result) break;
+    result += addition;
+    currentLength += addition.length;
+  }
+  
+  return result || content.slice(0, maxLength) + '...';
+}
+
 serve(async (req) => {
-  console.log('=== ASK FUNCTION START (with class tracking) ===');
+  console.log('=== ASK FUNCTION START (with document search) ===');
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -54,7 +93,7 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    // Parse request body (using the working pattern)
+    // Parse request body
     const rawBody = await req.text();
     let query, classId;
     
@@ -105,139 +144,48 @@ serve(async (req) => {
     let sourcesFound = 0;
     let responseGenerated = false;
 
-    // Step 1: Convert user query to embedding for similarity search
-    console.log('Converting query to embedding...');
+    // Step 1: Search documents using full-text search
+    console.log('Searching documents for relevant content...');
     
-    let queryEmbedding;
-    let retryCount = 0;
-    const maxRetries = 3;
+    const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 2);
+    let relevantDocs = [];
     
-    while (retryCount < maxRetries) {
-      try {
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: query,
-          }),
-        });
-
-        if (embeddingResponse.ok) {
-          const embeddingData = await embeddingResponse.json();
-          queryEmbedding = embeddingData.data[0].embedding;
-          break;
-        } else if (embeddingResponse.status === 429) {
-          retryCount++;
-          console.log(`Rate limited, attempt ${retryCount}/${maxRetries}`);
-          if (retryCount < maxRetries) {
-            const waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff
-            console.log(`Waiting ${waitTime}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-          }
-        } else {
-          console.log('ERROR: OpenAI embedding failed:', embeddingResponse.status);
-          throw new Error(`OpenAI embedding error: ${embeddingResponse.statusText}`);
-        }
-      } catch (error) {
-        console.log('ERROR: Network error during embedding:', error);
-        retryCount++;
-        if (retryCount < maxRetries) {
-          const waitTime = Math.pow(2, retryCount) * 1000;
-          console.log(`Waiting ${waitTime}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-      }
-    }
-
-    if (!queryEmbedding) {
-      console.log('Failed to get embedding after retries, falling back to keyword search');
-      // Fallback: simple text search using ilike instead of textSearch
-      const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 2);
-      let keywordChunks = [];
-      let keywordError = null;
-      
-      if (searchTerms.length > 0) {
-        const { data, error } = await supabase
-          .from('chunks')
+    if (searchTerms.length > 0) {
+      // Use PostgreSQL full-text search for better results
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('user_id', user.id)
+        .textSearch('content', searchTerms.join(' | '), {
+          type: 'websearch',
+          config: 'english'
+        })
+        .limit(5);
+        
+      if (error) {
+        console.log('Full-text search error, falling back to simple search:', error);
+        // Fallback to simple ilike search
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('documents')
           .select('*')
           .eq('user_id', user.id)
-          .ilike('text', `%${searchTerms[0]}%`)
-          .limit(10);
-        keywordChunks = data;
-        keywordError = error;
-      }
-        
-      if (keywordError) {
-        console.log('ERROR: Keyword search failed:', keywordError);
-        throw new Error('Failed to search course material');
-      }
-
-      if (!keywordChunks || keywordChunks.length === 0) {
-        return new Response(
-          JSON.stringify({ 
-            answer: 'I could not find relevant information in your uploaded materials to answer this question. Please make sure you have uploaded course materials related to your question.',
-            sources: [],
-            query: query
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
-      // Use keyword-matched chunks for context
-      const context = keywordChunks
-        .map((chunk: any, index: number) => 
-          `[Source ${index + 1}] ${chunk.source_file} (Page ${chunk.page_number})\n${chunk.text}`
-        )
-        .join('\n\n---\n\n');
-
-      console.log('Using keyword search context from', keywordChunks.length, 'chunks');
-
-      // Generate answer with keyword-matched context
-      const answer = `Based on your course materials, here's what I found regarding "${query}":\n\n${context.slice(0, 1500)}...\n\nPlease note: This response uses keyword matching due to temporary limitations. For more precise answers, please try again later.`;
-      
-      return new Response(
-        JSON.stringify({ 
-          answer,
-          sources: keywordChunks.map((chunk: any, index: number) => ({
-            id: index + 1,
-            source_file: chunk.source_file,
-            page_number: chunk.page_number || 1,
-            chunk_id: chunk.chunk_id
-          })),
-          query: query
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          .ilike('content', `%${searchTerms[0]}%`)
+          .limit(3);
+          
+        if (fallbackError) {
+          console.log('ERROR: Text search failed:', fallbackError);
+          throw new Error('Failed to search course material');
         }
-      );
-    }
-    
-    console.log('Query embedding generated, searching for similar chunks...');
-
-    // Step 2: Use vector similarity search to find relevant chunks
-    const { data: similarChunks, error: searchError } = await supabase
-      .rpc('match_chunks', {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.1, // Lower threshold to get more potentially relevant content
-        match_count: 15, // Get more chunks for better context
-        user_id: user.id
-      });
-
-    if (searchError) {
-      console.log('ERROR: Vector search failed:', searchError);
-      throw new Error('Failed to search course material');
+        relevantDocs = fallbackData || [];
+      } else {
+        relevantDocs = data || [];
+      }
     }
 
-    if (!similarChunks || similarChunks.length === 0) {
-      console.log('No relevant chunks found for query');
+    if (!relevantDocs || relevantDocs.length === 0) {
+      console.log('No relevant documents found for query');
       
-      // Log analytics for no results found with empty derived topics
+      // Log analytics for no results found
       const { error: logError } = await supabase
         .from('question_analytics')
         .insert({
@@ -267,24 +215,26 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Found ${similarChunks.length} relevant chunks with similarity scores`);
-    sourcesFound = similarChunks.length;
+    console.log(`Found ${relevantDocs.length} relevant documents`);
+    sourcesFound = relevantDocs.length;
 
-    // Step 3: Create rich context from the most relevant chunks
-    const context = similarChunks
-      .map((chunk: any, index: number) => 
-        `[Source ${index + 1}] ${chunk.source_file} (Page ${chunk.page_number})\n${chunk.text}`
-      )
+    // Step 2: Create context from relevant documents
+    const context = relevantDocs
+      .map((doc: any, index: number) => {
+        // Extract relevant excerpts from the document
+        const excerpts = extractRelevantExcerpts(doc.content, searchTerms, 800);
+        return `[Source ${index + 1}] ${doc.filename}\n${excerpts}`;
+      })
       .join('\n\n---\n\n');
 
-    console.log('Assembled context from', similarChunks.length, 'chunks');
+    console.log('Assembled context from', relevantDocs.length, 'documents');
 
-    // Step 4: Generate comprehensive answer using OpenAI with proper context
+    // Step 3: Generate comprehensive answer using OpenAI with proper context
     const systemPrompt = `You are an AI tutor and subject matter expert. You have been provided with excerpts from the student's course materials. Your job is to:
 
 1. Answer questions based ONLY on the provided course material context
 2. Be comprehensive and educational in your explanations  
-3. Reference specific sources and page numbers when possible
+3. Reference specific sources when possible
 4. If the context doesn't contain enough information, say so clearly
 5. Maintain an encouraging, educational tone
 6. Break down complex concepts into understandable parts
@@ -304,43 +254,52 @@ Please provide a detailed answer based on the course materials above, and refere
 
     // Try GPT-5 first, then GPT-4o as fallback
     let chatResponse;
-    let modelUsed = 'gpt-5';
+    let modelUsed = 'gpt-5-2025-08-07';
     
     const tryModel = async (model: string) => {
       console.log(`Trying model: ${model}`);
+      const requestBody: any = {
+        model: model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: userPrompt
+          }
+        ]
+      };
+
+      // Use different parameters for different model families
+      if (model.startsWith('gpt-5') || model.startsWith('gpt-4.1') || model.startsWith('o3') || model.startsWith('o4')) {
+        requestBody.max_completion_tokens = 1500;
+      } else {
+        requestBody.max_tokens = 1500;
+        requestBody.temperature = 0.7;
+      }
+
       return await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openaiApiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            {
-              role: 'user',
-              content: userPrompt
-            }
-          ],
-          max_completion_tokens: 1500,
-        }),
+        body: JSON.stringify(requestBody),
       });
     };
 
     // First attempt with GPT-5
     try {
-      chatResponse = await tryModel('gpt-5');
+      chatResponse = await tryModel('gpt-5-2025-08-07');
       if (chatResponse.ok) {
         const testData = await chatResponse.json();
         const testAnswer = testData.choices[0].message.content;
         // Check if response is meaningful (not empty or too short)
         if (testAnswer && testAnswer.trim().length > 50) {
           console.log('GPT-5 response successful');
-          modelUsed = 'gpt-5';
+          modelUsed = 'gpt-5-2025-08-07';
         } else {
           console.log('GPT-5 response too short, trying fallback');
           throw new Error('Response too short');
@@ -375,12 +334,11 @@ Please provide a detailed answer based on the course materials above, and refere
       return new Response(
         JSON.stringify({ 
           answer: fallbackAnswer,
-          sources: similarChunks.map((chunk: any, index: number) => ({
+          sources: relevantDocs.map((doc: any, index: number) => ({
             id: index + 1,
-            source_file: chunk.source_file,
-            page_number: chunk.page_number,
-            chunk_id: chunk.chunk_id,
-            similarity: chunk.similarity
+            source_file: doc.filename,
+            page_number: 1,
+            document_id: doc.id
           })),
           query: query
         }),
@@ -396,7 +354,7 @@ Please provide a detailed answer based on the course materials above, and refere
 
     console.log(`Generated comprehensive AI answer using ${modelUsed}`);
 
-    // Step 5: Classify question topics using AI
+    // Step 4: Classify question topics using AI
     console.log('Classifying question topics...');
     let derivedSubject = null;
     let derivedTopics = [];
@@ -476,13 +434,13 @@ Focus on the actual academic concepts being discussed, not generic terms.`;
       console.log('Topic classification failed:', classificationError.message);
     }
 
-    // Format sources with similarity scores
-    const sources = similarChunks.map((chunk: any, index: number) => ({
+    // Format sources
+    const sources = relevantDocs.map((doc: any, index: number) => ({
       id: index + 1,
-      source_file: chunk.source_file,
-      page_number: chunk.page_number || 1,
-      chunk_id: chunk.chunk_id,
-      similarity: chunk.similarity
+      source_file: doc.filename,
+      page_number: 1,
+      document_id: doc.id,
+      title: doc.title
     }));
 
     const result = {
@@ -491,34 +449,40 @@ Focus on the actual academic concepts being discussed, not generic terms.`;
       query
     };
 
-    console.log('Returning successful response');
+    // Log analytics with enhanced data
+    try {
+      const { error: logError } = await supabase
+        .from('question_analytics')
+        .insert({
+          user_id: user.id,
+          question: query,
+          class_id: classId,
+          subject: classSubject,
+          derived_subject: derivedSubject,
+          derived_topics: derivedTopics,
+          sources_found: sourcesFound,
+          response_generated: responseGenerated
+        });
 
-    // Log successful analytics with derived topics using direct SQL
-    const { error: logError } = await supabase
-      .from('question_analytics')
-      .insert({
-        user_id: user.id,
-        question: query,
-        class_id: classId,
-        subject: classSubject,
-        derived_subject: derivedSubject,
-        derived_topics: derivedTopics,
-        sources_found: sourcesFound,
-        response_generated: responseGenerated
-      });
-
-    if (logError) {
-      console.log('Warning: Failed to log question analytics:', logError);
+      if (logError) {
+        console.log('Warning: Failed to log question analytics:', logError);
+      } else {
+        console.log('✅ Analytics logged successfully');
+      }
+    } catch (analyticsError) {
+      console.log('Analytics logging error:', analyticsError);
     }
+
+    console.log('=== ASK FUNCTION COMPLETE ===');
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.log('ERROR: Function failed:', error.message);
+    console.error('❌ Ask function error:', error);
     return new Response(JSON.stringify({ 
-      error: 'Internal server error',
+      error: 'Failed to process question',
       details: error.message 
     }), {
       status: 500,

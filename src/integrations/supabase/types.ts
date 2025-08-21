@@ -128,6 +128,42 @@ export type Database = {
         }
         Relationships: []
       }
+      documents: {
+        Row: {
+          content: string
+          created_at: string
+          file_size: number | null
+          filename: string
+          id: string
+          page_count: number | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          file_size?: number | null
+          filename: string
+          id?: string
+          page_count?: number | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          file_size?: number | null
+          filename?: string
+          id?: string
+          page_count?: number | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       enrollments: {
         Row: {
           class_id: string
