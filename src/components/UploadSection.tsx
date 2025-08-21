@@ -142,6 +142,23 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
 
       console.log('Document saved successfully:', documentData)
 
+      // Link document to class if classId is provided
+      if (classId) {
+        const { error: linkError } = await supabase
+          .from('class_documents')
+          .insert({
+            class_id: classId,
+            document_id: documentData.id
+          })
+
+        if (linkError) {
+          console.error('Error linking document to class:', linkError)
+          throw new Error('Failed to link document to class')
+        }
+        
+        console.log('Document linked to class successfully')
+      }
+
       // Generate embeddings for better search
       toast({
         title: "Creating AI search index",

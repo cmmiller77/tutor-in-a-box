@@ -50,6 +50,27 @@ export type Database = {
         }
         Relationships: []
       }
+      class_documents: {
+        Row: {
+          class_id: string
+          created_at: string
+          document_id: string
+          id: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          document_id: string
+          id?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
       classes: {
         Row: {
           ai_enabled: boolean

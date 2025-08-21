@@ -38,19 +38,43 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Get documents from the new documents table
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id, filename, title, content, file_size, page_count, created_at, user_id')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
+      let query;
+      
+      if (classId) {
+        // Get documents linked to this specific class
+        query = supabase
+          .from('class_documents')
+          .select(`
+            documents:document_id (
+              id, filename, title, content, file_size, page_count, created_at, user_id
+            )
+          `)
+          .eq('class_id', classId)
+          .order('created_at', { ascending: false });
+      } else {
+        // Get all documents for the user
+        query = supabase
+          .from('documents')
+          .select('id, filename, title, content, file_size, page_count, created_at, user_id')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching documents:', error);
         return;
       }
 
-      setDocuments(data || []);
+      // Transform data based on query type
+      if (classId) {
+        // Extract documents from class_documents join
+        const documents = data?.map((item: any) => item.documents).filter(Boolean) || [];
+        setDocuments(documents);
+      } else {
+        setDocuments(data || []);
+      }
     } catch (error) {
       console.error('Error fetching documents:', error);
       toast({
@@ -72,32 +96,50 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
         throw new Error('Please sign in to delete documents');
       }
 
-      // Delete document from the documents table
-      const { error: docError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', documentId)
-        .eq('user_id', session.user.id);
+      if (classId) {
+        // If viewing class documents, just unlink from class (don't delete the document entirely)
+        const { error: unlinkError } = await supabase
+          .from('class_documents')
+          .delete()
+          .eq('class_id', classId)
+          .eq('document_id', documentId);
 
-      if (docError) {
-        throw new Error('Failed to delete document');
+        if (unlinkError) {
+          throw new Error('Failed to remove document from class');
+        }
+
+        toast({
+          title: "Document removed from class",
+          description: "The document has been removed from this class.",
+        });
+      } else {
+        // If viewing user's library, delete the document entirely
+        const { error: docError } = await supabase
+          .from('documents')
+          .delete()
+          .eq('id', documentId)
+          .eq('user_id', session.user.id);
+
+        if (docError) {
+          throw new Error('Failed to delete document');
+        }
+
+        // Try to delete the file from storage (best effort)
+        try {
+          const filePath = `${session.user.id}/${filename}`;
+          await supabase.storage
+            .from('pdfs')
+            .remove([filePath]);
+        } catch (storageError) {
+          console.warn('Could not delete file from storage:', storageError);
+          // Continue even if storage deletion fails
+        }
+
+        toast({
+          title: "Document deleted",
+          description: "The document has been removed from your library.",
+        });
       }
-
-      // Try to delete the file from storage (best effort)
-      try {
-        const filePath = `${session.user.id}/${filename}`;
-        await supabase.storage
-          .from('pdfs')
-          .remove([filePath]);
-      } catch (storageError) {
-        console.warn('Could not delete file from storage:', storageError);
-        // Continue even if storage deletion fails
-      }
-
-      toast({
-        title: "Document deleted",
-        description: "The document has been removed.",
-      });
 
       // Refresh the documents list
       await fetchDocuments();
@@ -236,16 +278,25 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
                         disabled={deletingId === doc.id}
                       >
                         <Trash2 className="w-4 h-4" />
-                        {deletingId === doc.id ? "Deleting..." : "Delete"}
+                        {deletingId === doc.id ? (classId ? "Removing..." : "Deleting...") : (classId ? "Remove" : "Delete")}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Document</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete "{doc.title || doc.filename}"? 
-                          This will remove the document and all its content ({doc.page_count} pages). 
-                          This action cannot be undone.
+                          {classId ? (
+                            <>
+                              Are you sure you want to remove "{doc.title || doc.filename}" from this class? 
+                              The document will remain in your library and can be added to other classes.
+                            </>
+                          ) : (
+                            <>
+                              Are you sure you want to delete "{doc.title || doc.filename}"? 
+                              This will permanently remove the document and all its content ({doc.page_count} pages). 
+                              This action cannot be undone.
+                            </>
+                          )}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -254,7 +305,7 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
                           onClick={() => deleteDocument(doc.id, doc.filename)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Delete Document
+                          {classId ? "Remove from Class" : "Delete Document"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
