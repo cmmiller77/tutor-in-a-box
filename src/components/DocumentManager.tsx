@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { FileText, Trash2, Download, Calendar, User, RefreshCw, Loader2 } from "lucide-react";
+import { FileText, Trash2, Download, Calendar, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -14,8 +14,6 @@ interface DocumentItem {
   created_at: string;
   user_id: string;
   chunk_count: number;
-  sample_text?: string;
-  total_length?: number;
 }
 
 interface DocumentManagerProps {
@@ -26,7 +24,6 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isReprocessing, setIsReprocessing] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -173,42 +170,6 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
     }
   };
 
-  const reprocessDocument = async (sourceFile: string) => {
-    try {
-      setIsReprocessing(sourceFile);
-      
-      const { data, error } = await supabase.functions.invoke('reprocess-pdf', {
-        body: { sourceFile }
-      });
-
-      if (error) {
-        console.error('Reprocess error:', error);
-        toast({
-          title: "Error",
-          description: "Failed to reprocess document",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "Success",
-        description: "Document reprocessed successfully! Updated content is now available.",
-      });
-      
-      await fetchDocuments(); // Refresh the list
-    } catch (error) {
-      console.error('Reprocess error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to reprocess document",
-        variant: "destructive",
-      });
-    } finally {
-      setIsReprocessing(null);
-    }
-  };
-
   if (loading) {
     return (
       <Card>
@@ -274,21 +235,6 @@ const DocumentManager = ({ classId }: DocumentManagerProps) => {
                   >
                     <Download className="w-4 h-4" />
                     Download
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => reprocessDocument(doc.source_file)}
-                    disabled={isReprocessing === doc.source_file}
-                    className="flex items-center gap-2"
-                  >
-                    {isReprocessing === doc.source_file ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4" />
-                    )}
-                    Reprocess
                   </Button>
                   
                   <AlertDialog>

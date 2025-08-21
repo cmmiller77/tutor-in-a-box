@@ -6,9 +6,6 @@ verify_jwt = true
 [functions.process-pdf]
 verify_jwt = true
 
-[functions.ingest-text]
-verify_jwt = true
-
 [functions.ask]
 verify_jwt = true
 
