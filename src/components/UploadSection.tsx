@@ -6,9 +6,10 @@ import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import uploadIcon from "@/assets/upload-icon.jpg"
 import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?url'
 
-// Set up PDF.js worker from CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+// Set up PDF.js worker using the bundled version
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 interface UploadSectionProps {
   classId?: string;
