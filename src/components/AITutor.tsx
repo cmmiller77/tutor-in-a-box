@@ -29,7 +29,7 @@ const AITutor = ({ classId }: AITutorProps) => {
   const [conversation, setConversation] = useState<QAResult[]>([])
   const { toast } = useToast()
 
-  const askQuestion = async () => {
+  const askQuestion = async (retryCount = 0) => {
     if (!question.trim()) {
       toast({
         title: "Please enter a question",
@@ -39,6 +39,8 @@ const AITutor = ({ classId }: AITutorProps) => {
       return
     }
 
+    const currentQuestion = question
+    
     try {
       setLoading(true)
       
@@ -49,14 +51,34 @@ const AITutor = ({ classId }: AITutorProps) => {
       }
 
       const response = await supabase.functions.invoke('ask', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: { 
-          query: question,
+          query: currentQuestion,
           class_id: classId 
         }
       })
 
+      console.log('Function response error:', response.error)
+
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to get answer')
+        // Handle specific error messages
+        const errorMessage = response.error.message || 'Failed to get answer'
+        if (errorMessage.includes('authentication') || errorMessage.includes('401')) {
+          throw new Error('Authentication failed. Please sign in again.')
+        } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+          throw new Error('Too many requests. Please wait a moment and try again.')
+        } else if (errorMessage.includes('server') || errorMessage.includes('500')) {
+          // Server error - retry once
+          if (retryCount === 0) {
+            console.log('Server error, retrying...')
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            return askQuestion(1)
+          }
+          throw new Error('Server error. Please try again later.')
+        }
+        throw new Error(errorMessage)
       }
 
       const result = response.data as QAResult
@@ -70,6 +92,19 @@ const AITutor = ({ classId }: AITutorProps) => {
 
     } catch (error) {
       console.error('Error asking question:', error)
+      
+      // Keep the question on error so user doesn't lose it
+      if (question !== currentQuestion) {
+        setQuestion(currentQuestion)
+      }
+      
+      // Network/transport error - retry once
+      if (retryCount === 0 && (error instanceof TypeError || error.message.includes('fetch'))) {
+        console.log('Network error, retrying...')
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        return askQuestion(1)
+      }
+      
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to get answer",
@@ -80,10 +115,12 @@ const AITutor = ({ classId }: AITutorProps) => {
     }
   }
 
+  const handleAskQuestion = () => askQuestion(0)
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      askQuestion()
+      handleAskQuestion()
     }
   }
 
@@ -112,7 +149,7 @@ const AITutor = ({ classId }: AITutorProps) => {
               className="flex-1"
             />
             <Button 
-              onClick={askQuestion} 
+              onClick={handleAskQuestion} 
               disabled={loading || !question.trim()}
               size="icon"
             >
