@@ -8,40 +8,70 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Helper function to extract relevant excerpts from document content
-function extractRelevantExcerpts(content: string, searchTerms: string[], maxLength: number = 800): string {
-  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
-  const relevantSentences: { sentence: string; score: number; index: number }[] = [];
+// Helper function to extract relevant excerpts from document content using paragraph windows
+function extractRelevantExcerpts(content: string, searchTerms: string[], maxLength: number = 1200): string {
+  // Split content into paragraphs and create overlapping windows
+  const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 30);
+  const windows: { text: string; score: number; index: number }[] = [];
   
-  // Score sentences based on search term matches
-  sentences.forEach((sentence, index) => {
-    const lowerSentence = sentence.toLowerCase();
-    let score = 0;
-    
-    searchTerms.forEach(term => {
-      const termCount = (lowerSentence.match(new RegExp(term.toLowerCase(), 'g')) || []).length;
-      score += termCount * term.length; // Weight longer terms more heavily
-    });
-    
-    if (score > 0) {
-      relevantSentences.push({ sentence: sentence.trim(), score, index });
+  // Expand search terms with common synonyms and related terms
+  const expandedTerms = [...searchTerms];
+  searchTerms.forEach(term => {
+    const lower = term.toLowerCase();
+    // Add mathematical synonyms
+    if (lower.includes('derivative') || lower.includes('differentiat')) {
+      expandedTerms.push('partial', 'gradient', 'slope', 'rate of change', 'tangent');
+    }
+    if (lower.includes('integral') || lower.includes('integrat')) {
+      expandedTerms.push('antiderivative', 'area under', 'accumulation');
+    }
+    if (lower.includes('limit')) {
+      expandedTerms.push('approaches', 'tends to', 'converges');
+    }
+    if (lower.includes('equation') || lower.includes('solve')) {
+      expandedTerms.push('formula', 'expression', 'calculate', 'find');
     }
   });
   
-  // Sort by score and position, take top sentences
-  relevantSentences.sort((a, b) => {
+  // Create overlapping windows of 2-3 paragraphs
+  for (let i = 0; i < paragraphs.length; i++) {
+    const windowSize = Math.min(3, paragraphs.length - i);
+    for (let size = 1; size <= windowSize; size++) {
+      const windowText = paragraphs.slice(i, i + size).join('\n\n');
+      const lowerWindow = windowText.toLowerCase();
+      
+      let score = 0;
+      expandedTerms.forEach(term => {
+        const termCount = (lowerWindow.match(new RegExp(term.toLowerCase(), 'g')) || []).length;
+        score += termCount * (term.length + (term.includes(' ') ? 5 : 0)); // Bonus for phrases
+      });
+      
+      if (score > 0) {
+        windows.push({ text: windowText.trim(), score, index: i });
+      }
+    }
+  }
+  
+  // Sort by score, then by position
+  windows.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    return a.index - b.index; // Prefer earlier sentences if scores are equal
+    return a.index - b.index;
   });
   
   let result = '';
   let currentLength = 0;
+  const usedIndices = new Set();
   
-  for (const item of relevantSentences) {
-    const addition = (result ? '. ' : '') + item.sentence + '.';
+  for (const window of windows) {
+    // Avoid overlapping content
+    if (usedIndices.has(window.index)) continue;
+    
+    const addition = (result ? '\n\n---\n\n' : '') + window.text;
     if (currentLength + addition.length > maxLength && result) break;
+    
     result += addition;
     currentLength += addition.length;
+    usedIndices.add(window.index);
   }
   
   return result || content.slice(0, maxLength) + '...';
@@ -145,39 +175,111 @@ serve(async (req) => {
     let sourcesFound = 0;
     let responseGenerated = false;
 
-    // Step 1: Search documents using full-text search
+    // Step 1: Try vector search first, then fallback to text search
     console.log('Searching documents for relevant content...');
     
     const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 2);
     let relevantDocs = [];
     
-    if (searchTerms.length > 0) {
-      // Use PostgreSQL full-text search for better results
+    // First try semantic search with embeddings
+    try {
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: query,
+        }),
+      });
+
+      if (embeddingResponse.ok) {
+        const embeddingData = await embeddingResponse.json();
+        const queryEmbedding = embeddingData.data[0].embedding;
+        
+        console.log('Generated query embedding, searching chunks...');
+        
+        // Search chunks using vector similarity
+        const { data: chunks, error: chunksError } = await supabase.rpc('match_chunks', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.3,
+          match_count: 10,
+          user_id: user.id
+        });
+        
+        if (!chunksError && chunks && chunks.length > 0) {
+          console.log(`Found ${chunks.length} relevant chunks via vector search`);
+          
+          // Group chunks by document and get unique documents
+          const docIds = [...new Set(chunks.map((chunk: any) => chunk.source_file))];
+          const { data: docs, error: docsError } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('user_id', user.id)
+            .in('filename', docIds);
+          
+          if (!docsError && docs) {
+            relevantDocs = docs;
+            console.log('Vector search found relevant documents');
+          }
+        }
+      }
+    } catch (embeddingError) {
+      console.log('Vector search failed, falling back to text search:', embeddingError);
+    }
+    
+    // Fallback to text search if vector search didn't work or found no results
+    if (relevantDocs.length === 0 && searchTerms.length > 0) {
+      console.log('Using text search fallback...');
+      
+      // Expand search terms with synonyms for better matching
+      const expandedSearchTerms = [...searchTerms];
+      searchTerms.forEach(term => {
+        const lower = term.toLowerCase();
+        if (lower.includes('derivative') || lower.includes('partial')) {
+          expandedSearchTerms.push('gradient', 'differentiation', 'slope');
+        }
+        if (lower.includes('integral')) {
+          expandedSearchTerms.push('integration', 'antiderivative');
+        }
+        if (lower.includes('equation')) {
+          expandedSearchTerms.push('formula', 'expression', 'solve');
+        }
+      });
+      
+      // Use PostgreSQL full-text search with expanded terms
       const { data, error } = await supabase
         .from('documents')
         .select('*')
         .eq('user_id', user.id)
-        .textSearch('content', searchTerms.join(' | '), {
+        .textSearch('content', expandedSearchTerms.slice(0, 8).join(' | '), {
           type: 'websearch',
           config: 'english'
         })
         .limit(5);
         
       if (error) {
-        console.log('Full-text search error, falling back to simple search:', error);
-        // Fallback to simple ilike search
+        console.log('Full-text search error, trying ILIKE search:', error);
+        // Fallback to ILIKE search with multiple terms
+        const ilike_conditions = expandedSearchTerms
+          .slice(0, 5)
+          .map(term => `content.ilike.%${term}%`)
+          .join(',');
+          
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('documents')
           .select('*')
           .eq('user_id', user.id)
-          .ilike('content', `%${searchTerms[0]}%`)
+          .or(ilike_conditions)
           .limit(3);
           
         if (fallbackError) {
-          console.log('ERROR: Text search failed:', fallbackError);
-          throw new Error('Failed to search course material');
+          console.log('ERROR: All search methods failed:', fallbackError);
+        } else {
+          relevantDocs = fallbackData || [];
         }
-        relevantDocs = fallbackData || [];
       } else {
         relevantDocs = data || [];
       }
@@ -262,28 +364,29 @@ serve(async (req) => {
     console.log(`Found ${relevantDocs.length} relevant documents`);
     sourcesFound = relevantDocs.length;
 
-    // Step 2: Create context from relevant documents
+    // Step 2: Create context from relevant documents with smarter excerpts
     const context = relevantDocs
       .map((doc: any, index: number) => {
-        // Extract relevant excerpts from the document
-        const excerpts = extractRelevantExcerpts(doc.content, searchTerms, 800);
+        // Extract relevant excerpts using paragraph windows
+        const excerpts = extractRelevantExcerpts(doc.content, searchTerms, 1200);
         return `[Source ${index + 1}] ${doc.filename}\n${excerpts}`;
       })
-      .join('\n\n---\n\n');
+      .join('\n\n===\n\n');
 
     console.log('Assembled context from', relevantDocs.length, 'documents');
 
-    // Step 3: Generate comprehensive answer using OpenAI with proper context
-    const systemPrompt = `You are an AI tutor and subject matter expert. You have been provided with excerpts from the student's course materials. Your job is to:
+    // Step 3: Generate comprehensive answer using OpenAI with improved context
+    const systemPrompt = `You are an AI tutor and subject matter expert with access to the student's course materials. Your job is to:
 
-1. Answer questions based ONLY on the provided course material context
-2. Be comprehensive and educational in your explanations  
-3. Reference specific sources when possible
-4. If the context doesn't contain enough information, say so clearly
-5. Maintain an encouraging, educational tone
-6. Break down complex concepts into understandable parts
+1. Answer questions comprehensively based on the provided course material context
+2. The course materials contain relevant information - look carefully through all sections
+3. Provide detailed, educational explanations with step-by-step breakdowns when appropriate
+4. Reference specific sources when citing information
+5. If you need to clarify or elaborate on concepts from the materials, do so helpfully
+6. Maintain an encouraging, educational tone that builds understanding
+7. Break down complex concepts into clear, understandable parts
 
-Remember: You are an expert on THIS specific course material, not general knowledge.`;
+IMPORTANT: The course materials provided contain the information needed to answer the question. Look through all sections carefully before concluding information is missing.`;
 
     const userPrompt = `Based on the following excerpts from my course materials, please answer my question comprehensively:
 

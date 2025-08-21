@@ -142,9 +142,36 @@ const UploadSection = ({ classId }: UploadSectionProps) => {
 
       console.log('Document saved successfully:', documentData)
 
+      // Generate embeddings for better search
+      toast({
+        title: "Creating AI search index",
+        description: "Generating embeddings for enhanced search...",
+      })
+
+      try {
+        const ingestResponse = await supabase.functions.invoke('ingest-document', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: { 
+            document_id: documentData.id 
+          }
+        })
+
+        if (ingestResponse.error) {
+          console.log('Warning: Failed to create embeddings:', ingestResponse.error)
+          // Don't throw error, document is still usable with text search
+        } else {
+          console.log('Embeddings created successfully:', ingestResponse.data)
+        }
+      } catch (embeddingError) {
+        console.log('Warning: Embedding creation failed:', embeddingError)
+        // Continue without embeddings
+      }
+
       toast({
         title: "PDF processed successfully",
-        description: `Document extracted (${pageCount} pages, ${fileSizeKB}KB). You can now ask questions about your document!`,
+        description: `Document indexed (${pageCount} pages, ${fileSizeKB}KB). You can now ask questions about your document!`,
       })
 
       setProcessing(false)
